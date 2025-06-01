@@ -3,10 +3,12 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 
 use App\Models\Quiz;
+use App\Models\UserQuizResult;
 use App\Services\QuizService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+
 class QuizController extends Controller{
     protected $quizService;
     public function __construct(QuizService $quizService){
@@ -45,6 +47,7 @@ class QuizController extends Controller{
 
         return response()->json($result);
     }
+
     public function getByLesson($lessonId)
     {
         $quizzes = Quiz::where('lesson_id', $lessonId)->get();
