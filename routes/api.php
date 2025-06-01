@@ -36,11 +36,11 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/auth/stats', [AuthController::class, 'getUserStats']);
 
     // Lesson routes
-    // Route::get('/lessons', [LessonController::class, 'index']);
-    // Route::get('/lessons/{id}', [LessonController::class, 'show']);
-    // Route::post('/lessons/{id}/progress', [LessonController::class, 'updateProgress']);
-    // Route::post('/lessons/{id}/complete', [LessonController::class, 'complete']);
-    // Route::get('/lessons/stats', [LessonController::class, 'getStats']);
+    Route::get('/lessons', [LessonController::class, 'index']);
+    Route::get('/lessons/stats', [LessonController::class, 'getStats']);
+    Route::get('/lessons/{id}', [LessonController::class, 'show']);
+    Route::post('/lessons/{id}/progress', [LessonController::class, 'updateProgress']);
+    Route::post('/lessons/{id}/complete', [LessonController::class, 'complete']);
 
     // Word management (chỉ cho admin/editor)
     Route::post('/words', [WordController::class, 'store']);

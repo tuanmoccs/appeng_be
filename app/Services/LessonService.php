@@ -132,6 +132,12 @@ class LessonService
       }
     }
 
+    // Đảm bảo progress không vượt quá 100%
+    $progressPercentage = min(100, max(0, $progressPercentage));
+
+    // Nếu progress >= 100%, tự động đánh dấu hoàn thành
+    $isCompleted = $progressPercentage >= 100;
+
     $progress = UserLessonProgress::updateOrCreate(
       [
         'user_id' => $userId,
@@ -141,8 +147,8 @@ class LessonService
         'progress_percentage' => $progressPercentage,
         'current_section' => $sectionIndex,
         'current_item' => $itemIndex,
-        'is_completed' => $progressPercentage >= 100,
-        'completed_at' => $progressPercentage >= 100 ? now() : null,
+        'is_completed' => $isCompleted,
+        'completed_at' => $isCompleted ? now() : null,
       ]
     );
 
