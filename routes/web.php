@@ -1,6 +1,13 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\AuthController;
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\LessonController;
+use App\Http\Controllers\Admin\TestController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\WordController;
+use App\Http\Controllers\Admin\QuizController;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,4 +22,45 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
+});
+Route::prefix('admin')->name('admin.')->group(function () {
+    // Authentication routes
+    Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+    // Protected admin routes
+    Route::middleware(['admin.auth'])->group(function () {
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/', [DashboardController::class, 'index']);
+
+        // Users management
+        Route::resource('users', UserController::class);
+
+        // Lessons management
+        Route::resource('lessons', LessonController::class);
+
+        // Words management
+        Route::resource('words', WordController::class);
+        Route::get('words/import/form', [WordController::class, 'importForm'])->name('words.import');
+        Route::post('words/import/form', [WordController::class, 'import'])->name('words.import.process');
+
+        // Quizzes management
+        Route::resource('quizzes', QuizController::class);
+        Route::get('quizzes/{quiz}/questions', [QuizController::class, 'questions'])->name('quizzes.questions');
+        Route::get('quizzes/{quiz}/questions/create', [QuizController::class, 'createQuestion'])->name('quizzes.questions.create');
+        Route::post('quizzes/{quiz}/questions', [QuizController::class, 'storeQuestion'])->name('quizzes.questions.store');
+        Route::get('quizzes/{quiz}/questions/{question}/edit', [QuizController::class, 'editQuestion'])->name('quizzes.questions.edit');
+        Route::put('quizzes/{quiz}/questions/{question}', [QuizController::class, 'updateQuestion'])->name('quizzes.questions.update');
+        Route::delete('quizzes/{quiz}/questions/{question}', [QuizController::class, 'destroyQuestion'])->name('quizzes.questions.destroy');
+
+        // Tests management
+        Route::resource('tests', TestController::class);
+        Route::get('tests/{test}/questions', [TestController::class, 'questions'])->name('tests.questions');
+        Route::get('tests/{test}/questions/create', [TestController::class, 'createQuestion'])->name('tests.questions.create');
+        Route::post('tests/{test}/questions', [TestController::class, 'storeQuestion'])->name('tests.questions.store');
+        Route::get('tests/{test}/questions/{question}/edit', [TestController::class, 'editQuestion'])->name('tests.questions.edit');
+        Route::put('tests/{test}/questions/{question}', [TestController::class, 'updateQuestion'])->name('tests.questions.update');
+        Route::delete('tests/{test}/questions/{question}', [TestController::class, 'destroyQuestion'])->name('tests.questions.destroy');
+    });
 });
