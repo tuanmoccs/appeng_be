@@ -4,6 +4,7 @@ use App\Http\Controllers\Client\AuthController;
 use App\Http\Controllers\Client\QuizController;
 use App\Http\Controllers\Client\WordController;
 use App\Http\Controllers\Client\LessonController;
+use App\Http\Controllers\Client\TestController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -41,15 +42,14 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/lessons/{id}', [LessonController::class, 'show']);
     Route::post('/lessons/{id}/progress', [LessonController::class, 'updateProgress']);
     Route::post('/lessons/{id}/complete', [LessonController::class, 'complete']);
-
-    // Word management (chỉ cho admin/editor)
-    Route::post('/words', [WordController::class, 'store']);
-    Route::put('/words/{id}', [WordController::class, 'update']);
-    Route::delete('/words/{id}', [WordController::class, 'destroy']);
-
     // Quiz routes
     Route::get('/quizzes', [QuizController::class, 'index']);
     Route::get('/quizzes/{id}', [QuizController::class, 'show']);
     Route::post('/quizzes/{id}/submit', [QuizController::class, 'submit']);
     Route::get('/user/quiz-results', [QuizController::class, 'getUserResults']);
+    //Test routes
+    Route::get('/tests', [TestController::class, 'index']);
+    Route::get('/tests/{id}', [TestController::class, 'show']);
+    Route::post('/tests/{id}/submit', [TestController::class, 'submitTest']);
+    Route::get('/tests/{id}/results', [TestController::class, 'getUserResults']);
 });
