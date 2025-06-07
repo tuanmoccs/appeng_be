@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Traits\Relation\UserTestResultRelation;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class UserTestResult extends Model
 {
-    use HasFactory;
+    use HasFactory, UserTestResultRelation;
 
     protected $fillable = [
         'user_id',
@@ -23,14 +24,4 @@ class UserTestResult extends Model
         'answers' => 'array',
         'passed' => 'boolean',
     ];
-
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function test()
-    {
-        return $this->belongsTo(Test::class);
-    }
 }
