@@ -22,54 +22,98 @@ class TestController extends Controller
   // Lấy danh sách các test available
   public function index()
   {
-    $tests = Test::where('is_active', true)->get();
-    return response()->json($tests);
+    try {
+      $tests = Test::where('is_active', true)->get();
+      return response()->json($tests);
+    } catch (\Exception $e) {
+      return response()->json([
+        'success' => false,
+        'message' => 'Không thể tải danh sách test'
+      ], 500);
+    }
   }
 
   // Lấy chi tiết một test bao gồm các questions
   public function show($id)
   {
-    $test = Test::with(['questions' => function ($query) {
-      $query->orderBy('order', 'asc');
-    }])->findOrFail($id);
+    try {
+      $test = Test::with(['questions' => function ($query) {
+        $query->orderBy('order', 'asc');
+      }])->findOrFail($id);
 
-    // Format lại options để FE dễ xử lý
-    $test->questions->transform(function ($question) {
-      $question->options = json_decode($question->options, true);
-      return $question;
-    });
+      // Format lại options để FE dễ xử lý
+      $test->questions->transform(function ($question) {
+        // Kiểm tra xem options đã là array chưa
+        if (is_string($question->options)) {
+          $question->options = json_decode($question->options, true);
+        }
 
-    return response()->json([
-      'test' => $test,
-      'time_limit' => $test->time_limit,
-      'total_questions' => $test->total_questions,
-    ]);
+        // Nếu decode thất bại hoặc không phải array, set default
+        if (!is_array($question->options)) {
+          $question->options = [];
+        }
+
+        return $question;
+      });
+
+      return response()->json([
+        'success' => true,
+        'test' => $test,
+        'time_limit' => $test->time_limit,
+        'total_questions' => $test->total_questions,
+      ]);
+    } catch (\Exception $e) {
+      return response()->json([
+        'success' => false,
+        'message' => 'Không thể tải test: ' . $e->getMessage()
+      ], 500);
+    }
   }
 
   // Submit kết quả test
   public function submitTest(Request $request, $testId)
   {
-    $request->validate([
-      'answers' => 'required|array',
-      'answers.*.question_id' => 'required|integer',
-      'answers.*.selected_answer' => 'required',
-    ]);
+    try {
+      $request->validate([
+        'answers' => 'required|array',
+        'answers.*.question_id' => 'required|integer',
+        'answers.*.selected_answer' => 'required',
+      ]);
 
-    $userId = Auth::id();
-    $result = $this->testService->evaluateTest($testId, $userId, $request->answers);
+      $userId = Auth::id();
+      $result = $this->testService->evaluateTest($testId, $userId, $request->answers);
 
-    return response()->json($result);
+      return response()->json([
+        'success' => true,
+        'result' => $result
+      ]);
+    } catch (\Exception $e) {
+      return response()->json([
+        'success' => false,
+        'message' => 'Không thể nộp bài test: ' . $e->getMessage()
+      ], 500);
+    }
   }
 
   // Lấy kết quả test của user
   public function getUserResults($testId)
   {
-    $userId = Auth::id();
-    $results = UserTestResult::where('user_id', $userId)
-      ->where('test_id', $testId)
-      ->orderBy('created_at', 'desc')
-      ->get();
+    try {
+      $userId = Auth::id();
+      $results = UserTestResult::where('user_id', $userId)
+        ->where('test_id', $testId)
+        ->orderBy('created_at', 'desc')
+        ->get();
 
-    return response()->json($results);
+      return response()->json([
+        'success' => true,
+        'results' => $results
+      ]);
+    } catch (\Exception $e) {
+      return response()->json([
+        'success' => false,
+        'message' => 'Không thể tải kết quả test'
+      ], 500);
+    }
   }
 }
