@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Traits\Relation\TestQuestionRelation;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class TestQuestion extends Model
 {
-    use HasFactory;
+    use HasFactory, TestQuestionRelation;
     protected $fillable = [
         'test_id',
         'question',
@@ -20,9 +21,4 @@ class TestQuestion extends Model
     protected $casts = [
         'options' => 'array',
     ];
-
-    public function test()
-    {
-        return $this->belongsTo(Test::class);
-    }
 }
