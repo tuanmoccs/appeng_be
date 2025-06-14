@@ -79,10 +79,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
 
         // Listening Questions Management
-        Route::prefix('listening-sections/{section}/questions')->group(function () {
-            Route::post('/', [ListeningQuestionController::class, 'store'])->name('listening-questions.store');
-            Route::put('/{question}', [ListeningQuestionController::class, 'update'])->name('listening-questions.update');
-            Route::delete('/{question}', [ListeningQuestionController::class, 'destroy'])->name('listening-questions.destroy');
-        });
+        Route::post('listening-sections/{section}/questions', [ListeningQuestionController::class, 'store'])->name('listening-questions.store');
+        Route::put('listening-sections/{section}/questions/{question}', [ListeningQuestionController::class, 'update'])->name('listening-questions.update');
+        Route::delete('listening-sections/{section}/questions/{question}', [ListeningQuestionController::class, 'destroy'])->name('listening-questions.destroy');
     });
 });
