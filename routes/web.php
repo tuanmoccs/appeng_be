@@ -8,6 +8,9 @@ use App\Http\Controllers\Admin\TestController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\WordController;
 use App\Http\Controllers\Admin\QuizController;
+use App\Http\Controllers\Admin\ListeningTestController;
+use App\Http\Controllers\Admin\ListeningSectionController;
+use App\Http\Controllers\Admin\ListeningQuestionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -62,5 +65,24 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('tests/{test}/questions/{question}/edit', [TestController::class, 'editQuestion'])->name('tests.questions.edit');
         Route::put('tests/{test}/questions/{question}', [TestController::class, 'updateQuestion'])->name('tests.questions.update');
         Route::delete('tests/{test}/questions/{question}', [TestController::class, 'destroyQuestion'])->name('tests.questions.destroy');
+        // Listening Tests Management
+        Route::resource('listening-tests', ListeningTestController::class);
+        Route::get('listening-tests/{test}/sections', [ListeningTestController::class, 'sections'])->name('listening-tests.sections');
+        Route::patch('listening-tests/{test}/toggle-status', [ListeningTestController::class, 'toggleStatus'])->name('listening-tests.toggle-status');
+
+        // Listening Sections Management
+        Route::prefix('listening-tests/{test}/sections')->group(function () {
+            Route::post('/', [ListeningSectionController::class, 'store'])->name('listening-sections.store');
+            Route::put('/{section}', [ListeningSectionController::class, 'update'])->name('listening-sections.update');
+            Route::delete('/{section}', [ListeningSectionController::class, 'destroy'])->name('listening-sections.destroy');
+        });
+
+
+        // Listening Questions Management
+        Route::prefix('listening-sections/{section}/questions')->group(function () {
+            Route::post('/', [ListeningQuestionController::class, 'store'])->name('listening-questions.store');
+            Route::put('/{question}', [ListeningQuestionController::class, 'update'])->name('listening-questions.update');
+            Route::delete('/{question}', [ListeningQuestionController::class, 'destroy'])->name('listening-questions.destroy');
+        });
     });
 });
