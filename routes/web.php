@@ -77,10 +77,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::delete('/{section}', [ListeningSectionController::class, 'destroy'])->name('listening-sections.destroy');
         });
 
-
+        Route::prefix('listening-sections')->group(function () {
+            Route::post('{section}/questions', [ListeningQuestionController::class, 'store'])->name('listening-questions.store');
+            Route::put('{section}/questions/{question}', [ListeningQuestionController::class, 'update'])->name('listening-questions.update');
+            Route::delete('{section}/questions/{question}', [ListeningQuestionController::class, 'destroy'])->name('listening-questions.destroy');
+        });
         // Listening Questions Management
-        Route::post('listening-sections/{section}/questions', [ListeningQuestionController::class, 'store'])->name('listening-questions.store');
-        Route::put('listening-sections/{section}/questions/{question}', [ListeningQuestionController::class, 'update'])->name('listening-questions.update');
-        Route::delete('listening-sections/{section}/questions/{question}', [ListeningQuestionController::class, 'destroy'])->name('listening-questions.destroy');
+        //     Route::post('listening-sections/{section}/questions', [ListeningQuestionController::class, 'store'])->name('listening-questions.store');
+        //     Route::put('listening-sections/{section}/questions/{question}', [ListeningQuestionController::class, 'update'])->name('listening-questions.update');
+        //     Route::delete('listening-sections/{section}/questions/{question}', [ListeningQuestionController::class, 'destroy'])->name('listening-questions.destroy');
     });
 });

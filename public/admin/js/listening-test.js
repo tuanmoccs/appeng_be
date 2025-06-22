@@ -46,11 +46,14 @@ $(document).ready(() => {
     const button = $(event.relatedTarget)
     const sectionId = button.data("section-id")
     const modal = $(this)
-
+    console.log("Section ID:", sectionId);
     // Reset form
     modal.find("form")[0].reset()
     modal.find(".audio-preview").remove()
     modal.find(".custom-file-label").removeClass("selected").html("Choose file")
+
+    // Thiết lập action cho form - QUAN TRỌNG
+    modal.find("form").attr("action", `/admin/listening-sections/${sectionId}/questions`)
 
     // Get section info from data attributes or find in DOM
     const sectionCard = button.closest(".section-card")
@@ -62,17 +65,17 @@ $(document).ready(() => {
 
     // Show/hide appropriate fields based on question type
     if (questionType === "single") {
-      $("#singleQuestionAudio").show()
-      $("#multipleQuestionTiming").hide()
-      $("#question_audio_file").prop("required", true)
+        $("#singleQuestionAudio").show()
+        $("#multipleQuestionTiming").hide()
+        $("#question_audio_file").prop("required", true)
     } else {
-      $("#singleQuestionAudio").hide()
-      $("#multipleQuestionTiming").show()
-      $("#question_audio_file").prop("required", false)
+        $("#singleQuestionAudio").hide()
+        $("#multipleQuestionTiming").show()
+        $("#question_audio_file").prop("required", false)
     }
 
     updateCorrectAnswerOptions()
-  })
+})
 
   // Edit Section Modal
   $(".edit-section-btn").on("click", function () {

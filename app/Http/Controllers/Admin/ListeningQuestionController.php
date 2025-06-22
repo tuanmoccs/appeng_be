@@ -60,7 +60,7 @@ class ListeningQuestionController extends Controller
       $question = ListeningQuestion::create($questionData);
 
       // Update total questions count
-      $sectionModel->listeningTest->updateTotalQuestions();
+      //$sectionModel->listeningTest->updateTotalQuestions();
 
       return redirect()->route('admin.listening-tests.show', $sectionModel->listening_test_id)
         ->with('success', 'Question created successfully!');
@@ -154,7 +154,7 @@ class ListeningQuestionController extends Controller
       $questionModel->delete();
 
       // Update total questions count
-      $sectionModel->listeningTest->updateTotalQuestions();
+      //$sectionModel->listeningTest->updateTotalQuestions();
 
       return redirect()->route('admin.listening-tests.show', $sectionModel->listening_test_id)
         ->with('success', 'Question deleted successfully!');
