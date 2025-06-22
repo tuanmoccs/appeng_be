@@ -599,7 +599,7 @@ $(document).ready(function() {
         }
     });
 
-    // Add Question Modal
+    // Add Question Modal - Fix the form action setting
     $('#addQuestionModal').on('show.bs.modal', function(event) {
         console.log('Add Question Modal opening');
         const button = $(event.relatedTarget);
@@ -611,8 +611,8 @@ $(document).ready(function() {
         modal.find('.audio-preview').remove();
         modal.find('.custom-file-label').removeClass('selected').html('Choose file');
         
-        // Set form action
-        modal.find('#addQuestionForm').attr('action', '/listening-sections/' + sectionId + '/questions');
+        // Set form action - FIXED
+        modal.find('#addQuestionForm').attr('action', '{{ route("admin.listening-questions.store", ":sectionId") }}'.replace(':sectionId', sectionId));
         modal.find('#question_section_id').val(sectionId);
         
         // Get section info from DOM
@@ -632,12 +632,9 @@ $(document).ready(function() {
             $('#multipleQuestionTiming').show();
             $('#question_audio_file').prop('required', false);
         }
-        
-        // Initialize correct answer options with default values
-        updateCorrectAnswerOptions();
     });
 
-    // Edit Section Modal
+    // Edit Section Modal - Fix the form action setting
     $('.edit-section-btn').on('click', function() {
         console.log('Edit Section button clicked');
         const id = $(this).data('id');
@@ -647,7 +644,9 @@ $(document).ready(function() {
         const order = $(this).data('order');
         
         const form = $('#editSectionForm');
-        form.attr('action', '/admin/listening-tests/' + $('#editSectionForm').data('test-id') + '/sections/' + id);
+        // FIX THIS LINE - get test ID from current URL or data attribute
+        const testId = {{ $test->id }};
+        form.attr('action', '/admin/listening-tests/' + testId + '/sections/' + id);
         form.find('#edit_title').val(title);
         form.find('#edit_instructions').val(instructions);
         form.find('#edit_question_type').val(questionType);
@@ -658,7 +657,7 @@ $(document).ready(function() {
         form.find('.audio-preview').remove();
     });
 
-    // Edit Question Modal
+    // Edit Question Modal - Fix the form action setting
     $('.edit-question-btn').on('click', function() {
         console.log('Edit Question button clicked');
         const id = $(this).data('id');
@@ -669,12 +668,12 @@ $(document).ready(function() {
         const audioEndTime = $(this).data('audio-end-time');
         const order = $(this).data('order');
         
-        // Find section ID
-        const sectionId = $(this).closest('.section-card').find('[data-section-id]').data('section-id') || 
-                         $(this).closest('.section-card').find('.btn[data-section-id]').data('section-id');
+        // Find section ID from the closest section card
+        const sectionCard = $(this).closest('.section-card');
+        const sectionId = sectionCard.find('[data-toggle="modal"][data-target="#addQuestionModal"]').data('section-id');
         
         const form = $('#editQuestionForm');
-        form.attr('action', '/listening-sections/' + sectionId + '/questions/' + id);
+        form.attr('action', '{{ url("admin/listening-sections") }}/' + sectionId + '/questions/' + id);
         form.find('#edit_question_text').val(question);
         form.find('#edit_audio_start_time').val(audioStartTime || '');
         form.find('#edit_audio_end_time').val(audioEndTime || '');
@@ -691,38 +690,37 @@ $(document).ready(function() {
         $.each(options, function(index, option) {
             const letter = String.fromCharCode(65 + index); // A, B, C, ...
             const removeBtn = index > 1 ? `
-                <div class="input-group-append">
-                    <button type="button" class="btn btn-danger remove-option-btn">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            ` : '';
-            
-            const html = `
-                <div class="input-group mb-2">
-                    <div class="input-group-prepend">
-                        <div class="input-group-text">${letter}</div>
-                    </div>
-                    <input type="text" class="form-control edit-option" name="options[]" value="${option}" required>
-                    ${removeBtn}
-                </div>
-            `;
-            optionsContainer.append(html);
-        });
+            <div class="input-group-append">
+                <button type="button" class="btn btn-danger remove-option-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        ` : '';
         
-        // updateEditCorrectAnswerOptions(correctAnswer);
-        form.find('#edit_correct_answer').val(correctAnswer);
-        
-        // Determine if we need to show audio upload or timing fields
-        const sectionType = $(this).closest('.section-card').find('.badge-info').text().toLowerCase();
-        if (sectionType === 'single') {
-            $('#edit_singleQuestionAudio').show();
-            $('#edit_multipleQuestionTiming').hide();
-        } else {
-            $('#edit_singleQuestionAudio').hide();
-            $('#edit_multipleQuestionTiming').show();
-        }
+        const html = `
+            <div class="input-group mb-2">
+                <div class="input-group-prepend">
+                    <div class="input-group-text">${letter}</div>
+                </div>
+                <input type="text" class="form-control edit-option" name="options[]" value="${option}" required>
+                ${removeBtn}
+            </div>
+        `;
+        optionsContainer.append(html);
     });
+    
+    form.find('#edit_correct_answer').val(correctAnswer);
+    
+    // Determine if we need to show audio upload or timing fields
+    const sectionType = sectionCard.find('.badge-info').text().toLowerCase();
+    if (sectionType === 'single') {
+        $('#edit_singleQuestionAudio').show();
+        $('#edit_multipleQuestionTiming').hide();
+    } else {
+        $('#edit_singleQuestionAudio').hide();
+        $('#edit_multipleQuestionTiming').show();
+    }
+});
 
     // Add option button
     $('#add-option-btn').on('click', function() {

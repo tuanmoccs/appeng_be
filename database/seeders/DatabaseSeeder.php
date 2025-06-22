@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             UserAchievementSeeder::class,
             AdminSeeder::class,
             TestSeeder::class,
+            ListeningQuestionSeeder:: class,
         ]);
     }
 }

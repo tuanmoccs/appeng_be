@@ -5,6 +5,7 @@ use App\Http\Controllers\Client\QuizController;
 use App\Http\Controllers\Client\WordController;
 use App\Http\Controllers\Client\LessonController;
 use App\Http\Controllers\Client\TestController;
+use App\Http\Controllers\Client\ListeningTestController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -52,4 +53,15 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/tests/{id}', [TestController::class, 'show']);
     Route::post('/tests/{id}/submit', [TestController::class, 'submitTest']);
     Route::get('/tests/{id}/results', [TestController::class, 'getUserResults']);
+
+    Route::get('/listening-tests', [ListeningTestController::class, 'index']);
+
+    // Get specific listening test with sections and questions
+    Route::get('/listening-tests/{id}', [ListeningTestController::class, 'show']);
+
+    // Submit listening test answers
+    Route::post('/listening-tests/{id}/submit', [ListeningTestController::class, 'submit']);
+
+    // Get user listening test results
+    Route::get('/listening-tests/{id}/results', [ListeningTestController::class, 'results']);
 });
