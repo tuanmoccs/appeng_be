@@ -8,6 +8,7 @@ use App\Models\UserListeningResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ListeningTestController extends Controller
 {
@@ -27,6 +28,7 @@ class ListeningTestController extends Controller
                 'tests' => $tests
             ]);
         } catch (\Exception $e) {
+            Log::error('Error fetching listening tests: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Không thể tải danh sách listening test'
@@ -40,6 +42,27 @@ class ListeningTestController extends Controller
     public function show($id)
     {
         try {
+            // Validate test ID
+            if (!is_numeric($id)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'ID listening test không hợp lệ'
+                ], 400);
+            }
+
+            // Check if test exists and is active
+            $test = ListeningTest::where('id', $id)
+                ->where('is_active', true)
+                ->first();
+
+            if (!$test) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Không tìm thấy listening test'
+                ], 404);
+            }
+
+            // Load test with sections and questions
             $test = ListeningTest::with([
                 'sections' => function ($query) {
                     $query->orderBy('order');
@@ -48,40 +71,69 @@ class ListeningTestController extends Controller
                     $query->orderBy('order')
                         ->select('id', 'listening_section_id', 'question', 'options', 'audio_file', 'audio_start_time', 'audio_end_time', 'order');
                 }
-            ])->findOrFail($id);
+            ])->find($id);
+
+            // Validate that test has sections
+            if (!$test->sections || $test->sections->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Listening test không có section nào'
+                ], 404);
+            }
 
             // Process sections and questions
             $test->sections->each(function ($section) {
+                // Validate section has questions
+                if ($section->questions->isEmpty()) {
+                    Log::warning("Section {$section->id} has no questions");
+                }
+
                 $section->questions->each(function ($question) {
                     // Ensure options is an array
                     if (is_string($question->options)) {
                         $question->options = json_decode($question->options, true) ?: [];
                     }
-                    
+
+                    // Validate options array
+                    if (!is_array($question->options)) {
+                        $question->options = [];
+                        Log::warning("Question {$question->id} has invalid options format");
+                    }
+
                     // Add full audio URL if exists
                     if ($question->audio_file) {
                         $question->audio_url = asset('storage/' . $question->audio_file);
                     }
-                    
+
                     // Remove correct_answer from response for security
                     unset($question->correct_answer);
                 });
-                
+
                 // Add full audio URL for section
                 if ($section->audio_file) {
-                    $section->audio_url = asset('storage/' . $section->audio_file);
+                    $section->audio_url = url('storage/' . $section->audio_file);
+
+                    // Check if audio file exists
+                    $audioPath = storage_path('app/public/' . $section->audio_file);
+                    if (!file_exists($audioPath)) {
+                        Log::warning("Audio file not found: {$audioPath}");
+                        $section->audio_url = null;
+                    }
                 }
             });
+
+            Log::info("Listening test {$id} loaded successfully with " . $test->sections->count() . " sections");
 
             return response()->json([
                 'success' => true,
                 'test' => $test
             ]);
         } catch (\Exception $e) {
+            Log::error('Error fetching listening test: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Không tìm thấy listening test'
-            ], 404);
+                'message' => 'Không thể tải listening test'
+            ], 500);
         }
     }
 
@@ -102,7 +154,7 @@ class ListeningTestController extends Controller
 
             $test = ListeningTest::with(['sections.questions'])->findOrFail($id);
             $user = Auth::user();
-            
+
             // Get all questions with correct answers
             $allQuestions = collect();
             foreach ($test->sections as $section) {
@@ -148,9 +200,9 @@ class ListeningTestController extends Controller
                     'result_id' => $result->id
                 ]
             ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Error submitting listening test: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Không thể nộp bài listening test'
@@ -175,6 +227,7 @@ class ListeningTestController extends Controller
                 'results' => $results
             ]);
         } catch (\Exception $e) {
+            Log::error('Error fetching listening test results: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Không thể tải kết quả listening test'
