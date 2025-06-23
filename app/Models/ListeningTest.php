@@ -23,16 +23,6 @@ class ListeningTest extends Model
     'is_active' => 'boolean',
   ];
 
-  public function sections()
-  {
-    return $this->hasMany(ListeningSection::class)->orderBy('order');
-  }
-
-  public function results()
-  {
-    return $this->hasMany(UserListeningResult::class);
-  }
-
   // Update total questions count
   public function updateTotalQuestions()
   {
