@@ -20,6 +20,8 @@ Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/send-reset-otp', [AuthController::class, 'sendResetOTP']);
+    Route::post('/reset-password-otp', [AuthController::class, 'resetPasswordWithOTP']);
 });
 
 // Public routes (không cần authentication)

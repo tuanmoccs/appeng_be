@@ -600,30 +600,35 @@ $(document).ready(function() {
     });
 
     // Add Question Modal - Fix the form action setting
-    $('#addQuestionModal').on('show.bs.modal', function(event) {
-        console.log('Add Question Modal opening');
-        const button = $(event.relatedTarget);
-        const sectionId = button.data('section-id');
-        const modal = $(this);
-        
-        // Reset form
-        modal.find('form')[0].reset();
-        modal.find('.audio-preview').remove();
-        modal.find('.custom-file-label').removeClass('selected').html('Choose file');
-        
-        // Set form action - FIXED
-        modal.find('#addQuestionForm').attr('action', '{{ route("admin.listening-questions.store", ":sectionId") }}'.replace(':sectionId', sectionId));
-        modal.find('#question_section_id').val(sectionId);
-        
-        // Get section info from DOM
-        const sectionCard = button.closest('.section-card');
-        const questionType = sectionCard.find('.badge-info').text().toLowerCase();
-        const questionCount = sectionCard.find('.question-card').length;
-        
-        modal.find('#question_order').val(questionCount + 1);
-        
-        // Show/hide appropriate fields based on question type
-        if (questionType === 'single') {
+    $('#addQuestionModal').on('show.bs.modal', function (event) {
+        const button    = $(event.relatedTarget);           // nút “Add Question”
+        const sectionId = button.data('section-id');        // ID section vừa bấm
+        const form      = $('#addQuestionForm');
+
+        // gán URL đích
+        form.attr('action', `/admin/listening-sections/${sectionId}/questions`);
+
+        // reset form (nếu cần)
+        form[0].reset();
+        form.find('.audio-preview').remove();
+        form.find('.custom-file-label')
+            .removeClass('selected')
+            .text('Choose file');
+
+        // tự điền order
+        const questionCount = button                      // tìm card section hiện tại
+            .closest('.section-card')
+            .find('.question-card').length;
+        $('#question_order').val(questionCount + 1);
+
+        // hiển thị/ẩn input audio theo loại câu hỏi
+        const sectionType = button
+            .closest('.section-card')
+            .find('.badge-info')
+            .text()
+            .trim()
+            .toLowerCase();
+        if (sectionType === 'single') {
             $('#singleQuestionAudio').show();
             $('#multipleQuestionTiming').hide();
             $('#question_audio_file').prop('required', true);
@@ -633,6 +638,7 @@ $(document).ready(function() {
             $('#question_audio_file').prop('required', false);
         }
     });
+
 
     // Edit Section Modal - Fix the form action setting
     $('.edit-section-btn').on('click', function() {

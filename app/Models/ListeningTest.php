@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Traits\ListeningTestRelation;
+use App\Models\Traits\Relation\ListeningTestRelation as RelationListeningTestRelation;
 
 class ListeningTest extends Model
 {
-  use HasFactory;
+  use HasFactory, RelationListeningTestRelation;
 
   protected $fillable = [
     'title',
@@ -22,16 +24,6 @@ class ListeningTest extends Model
   protected $casts = [
     'is_active' => 'boolean',
   ];
-
-  public function sections()
-  {
-    return $this->hasMany(ListeningSection::class)->orderBy('order');
-  }
-
-  public function results()
-  {
-    return $this->hasMany(UserListeningResult::class);
-  }
 
   // Update total questions count
   public function updateTotalQuestions()

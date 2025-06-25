@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Auth;
 use Exception;
 use Illuminate\Auth\Events\Validated;
 use Illuminate\Support\Facades\Validator;
+use App\Mail\ResetPasswordOtpMail;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -108,7 +110,68 @@ class AuthController extends Controller
             ], 500);
         }
     }
+    public function resetPasswordWithOTP(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'email' => 'required|email|exists:users,email',
+                'otp' => 'required|string|size:6',
+                'password' => 'required|string|min:6|confirmed',
+            ]);
 
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $this->authService->resetPasswordWithOTP(
+                $request->email,
+                $request->otp,
+                $request->password
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Mật khẩu đã được đặt lại thành công'
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    public function sendResetOTP(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'email' => 'required|email|exists:users,email',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $email = $request->email;
+            $this->authService->sendResetOTP($email);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Mã OTP đã được gửi đến email của bạn'
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
     /**
      * Forgot password
      */
