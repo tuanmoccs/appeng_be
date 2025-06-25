@@ -371,7 +371,7 @@
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
-            <form id="addQuestionForm" action="{{ route('admin.listening-questions.store', $section->id) }}" method="POST" enctype="multipart/form-data">
+            <form id="addQuestionForm" action="{{ isset($section) ? route('admin.listening-questions.store', $section->id) : '#' }}"  method="POST" enctype="multipart/form-data">
                 @csrf
                 <div class="modal-body">
                     <input type="hidden" name="listening_section_id" id="question_section_id">

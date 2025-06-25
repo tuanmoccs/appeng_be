@@ -27,18 +27,30 @@
                     <div class="mb-3">
                         <label class="form-label">Lựa chọn <span class="text-danger">*</span></label>
                         <div id="options-container">
-                            @foreach($question->options as $index => $option)
-                                <div class="input-group mb-2">
-                                    <span class="input-group-text">{{ chr(65 + $index) }}</span>
-                                    <input type="text" class="form-control @error('options.' . $index) is-invalid @enderror" 
-                                           name="options[]" value="{{ old('options.' . $index, $option) }}" required>
-                                    @if($index >= 2)
-                                        <button type="button" class="btn btn-outline-danger remove-option">
-                                            <i class="fas fa-minus"></i>
-                                        </button>
-                                    @endif
-                                </div>
-                            @endforeach
+                            @php
+                                // Nếu options là chuỗi JSON, thì decode thủ công
+                                $options = is_array($question->options) ? $question->options : json_decode($question->options, true);
+                            @endphp
+
+                            @if($options && is_array($options))
+                                @foreach($options as $index => $option)
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text">{{ chr(65 + $index) }}</span>
+                                        <input type="text"
+                                            class="form-control @error('options.' . $index) is-invalid @enderror"
+                                            name="options[]"
+                                            value="{{ old('options.' . $index, $option) }}"
+                                            required>
+                                        @if($index >= 2)
+                                            <button type="button" class="btn btn-outline-danger remove-option">
+                                                <i class="fas fa-minus"></i>
+                                            </button>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            @else
+                                <p class="text-danger">Không có lựa chọn nào được tìm thấy.</p>
+                            @endif
                         </div>
                         <button type="button" class="btn btn-sm btn-outline-primary" id="add-option">
                             <i class="fas fa-plus"></i> Thêm lựa chọn
@@ -101,7 +113,7 @@
 @section('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    let optionCount = {{ count($question->options) }};
+    let optionCount = {{ count(is_array($question->options) ? $question->options : json_decode($question->options, true)) }};
     const maxOptions = 6;
     
     // Add option
