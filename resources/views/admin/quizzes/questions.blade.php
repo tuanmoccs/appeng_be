@@ -62,9 +62,19 @@
                             <td>{{ $question->id }}</td>
                             <td>{{ Str::limit($question->question, 100) }}</td>
                             <td>
-                                @foreach($question->options as $index => $option)
-                                    <span class="badge bg-secondary me-1">{{ chr(65 + $index) }}. {{ Str::limit($option, 20) }}</span>
-                                @endforeach
+                                @php
+                                    $options = is_array($question->options) ? $question->options : json_decode($question->options, true);
+                                @endphp
+
+                                @if($options)
+                                    @foreach($options as $index => $option)
+                                        <span class="badge bg-secondary me-1">
+                                            {{ chr(65 + $index) }}. {{ \Illuminate\Support\Str::limit($option, 20) }}
+                                        </span>
+                                    @endforeach
+                                @else
+                                    <span class="text-danger">Không có lựa chọn hợp lệ</span>
+                                @endif
                             </td>
                             <td>
                                 <span class="badge bg-success">{{ $question->correct_answer }}</span>
