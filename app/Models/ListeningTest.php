@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Traits\ListeningTestRelation;
+use App\Models\Traits\Relation\ListeningTestRelation as RelationListeningTestRelation;
 
 class ListeningTest extends Model
 {
-  use HasFactory, ListeningTestRelation;
+  use HasFactory, RelationListeningTestRelation;
 
   protected $fillable = [
     'title',

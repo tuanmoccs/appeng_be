@@ -5,13 +5,18 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\UserStat;
 use App\Models\PasswordResetOtp;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Auth\Events\PasswordReset;  
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Str;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Exception;
+use App\Mail\ResetPasswordOtpMail;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
+
 
 class AuthService
 {
@@ -178,18 +183,16 @@ class AuthService
             'expires_at' => $expiresAt,
         ]);
 
-        // Send OTP via email
+        // Send OTP via email using Mailable
         try {
-            Mail::send('mail.resetpassword', [
-                'otp' => $otp,
-                'user' => $user,
-                'expires_at' => $expiresAt
-            ], function ($message) use ($email) {
-                $message->to($email)
-                        ->subject('Mã OTP đặt lại mật khẩu - ' . config('app.name'));
-            });
+            Mail::to($email)->send(new ResetPasswordOTPMail($user, $otp, $expiresAt));
         } catch (Exception $e) {
-            // If email fails, still throw an exception but don't expose email details
+            // Log the error for debugging
+            Log::error('Failed to send OTP email: ' . $e->getMessage());
+
+            // If email fails, delete the OTP record to prevent confusion
+            PasswordResetOtp::where('email', $email)->where('otp', $otp)->delete();
+
             throw new Exception('Không thể gửi email OTP. Vui lòng thử lại sau.');
         }
     }

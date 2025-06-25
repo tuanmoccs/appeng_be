@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Auth;
 use Exception;
 use Illuminate\Auth\Events\Validated;
 use Illuminate\Support\Facades\Validator;
+use App\Mail\ResetPasswordOtpMail;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -141,7 +143,7 @@ class AuthController extends Controller
             ], 400);
         }
     }
-    
+
     public function sendResetOTP(Request $request): JsonResponse
     {
         try {
