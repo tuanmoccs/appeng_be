@@ -4,10 +4,11 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Models\UserStat;
+use App\Models\PasswordResetOtp;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Auth\Events\PasswordReset;  
 use Illuminate\Support\Str;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Exception;
@@ -154,5 +155,76 @@ class AuthService
             'streak_days' => $userStat->streak_days,
             'last_activity_at' => $userStat->last_activity_at,
         ];
+    }
+    public function sendResetOTP(string $email): void
+    {
+        $user = User::where('email', $email)->first();
+
+        if (!$user) {
+            throw new Exception('Không tìm thấy người dùng với email này');
+        }
+
+        // Clean up old OTPs for this email
+        PasswordResetOtp::where('email', $email)->delete();
+
+        // Generate new OTP
+        $otp = PasswordResetOtp::generateOTP();
+        $expiresAt = Carbon::now()->addMinutes(10); // OTP expires in 10 minutes
+
+        // Save OTP to database
+        PasswordResetOtp::create([
+            'email' => $email,
+            'otp' => $otp,
+            'expires_at' => $expiresAt,
+        ]);
+
+        // Send OTP via email
+        try {
+            Mail::send('mail.resetpassword', [
+                'otp' => $otp,
+                'user' => $user,
+                'expires_at' => $expiresAt
+            ], function ($message) use ($email) {
+                $message->to($email)
+                        ->subject('Mã OTP đặt lại mật khẩu - ' . config('app.name'));
+            });
+        } catch (Exception $e) {
+            // If email fails, still throw an exception but don't expose email details
+            throw new Exception('Không thể gửi email OTP. Vui lòng thử lại sau.');
+        }
+    }
+
+    /**
+     * Reset password using OTP
+     */
+    public function resetPasswordWithOTP(string $email, string $otp, string $newPassword): void
+    {
+        $user = User::where('email', $email)->first();
+
+        if (!$user) {
+            throw new Exception('Không tìm thấy người dùng với email này');
+        }
+
+        // Find valid OTP
+        $otpRecord = PasswordResetOtp::where('email', $email)
+            ->where('otp', $otp)
+            ->where('used', false)
+            ->where('expires_at', '>', Carbon::now())
+            ->first();
+
+        if (!$otpRecord) {
+            throw new Exception('Mã OTP không hợp lệ hoặc đã hết hạn');
+        }
+
+        // Update password
+        $user->update([
+            'password' => Hash::make($newPassword)
+        ]);
+
+        // Mark OTP as used
+        $otpRecord->markAsUsed();
+
+        // Clean up old OTPs
+        PasswordResetOtp::cleanup();
     }
 }
