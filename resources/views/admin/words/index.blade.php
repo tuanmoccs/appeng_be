@@ -102,7 +102,8 @@
             </table>
         </div>
 
-        {{ $words->appends(request()->query())->links() }}
+        {{ $words->appends(request()->query())->links('pagination::bootstrap-4', ['class' => 'pagination pagination-sm']) }}
+
     </div>
 </div>
 @endsection

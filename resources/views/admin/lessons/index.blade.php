@@ -69,7 +69,7 @@
             </table>
         </div>
 
-        {{ $lessons->links() }}
+        {{ $lessons->links('pagination::bootstrap-4', ['class' => 'pagination pagination-sm']) }}
     </div>
 </div>
 @endsection
