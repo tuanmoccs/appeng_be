@@ -64,7 +64,7 @@
             </table>
         </div>
 
-        {{ $users->links() }}
+        {{ $users->links('pagination::bootstrap-4', ['class' => 'pagination pagination-sm']) }}
     </div>
 </div>
 @endsection

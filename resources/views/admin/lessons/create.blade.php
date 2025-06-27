@@ -91,7 +91,7 @@
     </div>
 
     <div class="col-md-4">
-        <div class="card">
+        {{-- <div class="card">
             <div class="card-header">
                 <h6>Hướng dẫn JSON Content</h6>
             </div>
@@ -122,7 +122,7 @@
                     <li>• Có thể có nhiều sections</li>
                 </ul>
             </div>
-        </div>
+        </div> --}}
 
         <div class="card mt-3">
             <div class="card-header">

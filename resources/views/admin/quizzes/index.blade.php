@@ -86,7 +86,7 @@
             </table>
         </div>
 
-        {{ $quizzes->appends(request()->query())->links() }}
+        {{ $quizzes->appends(request()->query())->links('pagination::bootstrap-4', ['class' => 'pagination pagination-sm']) }}
     </div>
 </div>
 @endsection
