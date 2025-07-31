@@ -18,12 +18,25 @@ class TestService
 
       $correctCount = 0;
       $totalQuestions = $test->total_questions;
-
+      $detailedResults = [];
       // Tính số câu trả lời đúng
       foreach ($userAnswers as $answer) {
         $question = $questions->find($answer['question_id']);
-        if ($question && $question->correct_answer === $answer['selected_answer']) {
-          $correctCount++;
+        if ($question) {
+          $isCorrect = $question->correct_answer === $answer['selected_answer'];
+          if ($isCorrect) {
+            $correctCount++;
+          }
+
+          // Thêm thông tin chi tiết cho từng câu hỏi
+          $detailedResults[] = [
+            'question_id' => $question->id,
+            'question' => $question->question,
+            'options' => is_string($question->options) ? json_decode($question->options, true) : $question->options,
+            'user_answer' => $answer['selected_answer'],
+            'correct_answer' => $question->correct_answer,
+            'is_correct' => $isCorrect,
+          ];
         }
       }
 
@@ -49,6 +62,7 @@ class TestService
         'correct_answers' => $correctCount,
         'total_questions' => $totalQuestions,
         'result_id' => $result->id,
+        'detailed_results' => $detailedResults
       ];
     } catch (\Exception $e) {
       throw new \Exception('Lỗi khi đánh giá test: ' . $e->getMessage());
