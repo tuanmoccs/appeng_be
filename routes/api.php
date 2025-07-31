@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
+
 // Authentication routes (public)
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
@@ -27,7 +28,10 @@ Route::prefix('auth')->group(function () {
 // Public routes (không cần authentication)
 Route::get('/words', [WordController::class, 'index']);
 Route::get('/words/{id}', [WordController::class, 'show']);
-
+Route::get('/lessons', [LessonController::class, 'index']);
+Route::get('/quizzes', [QuizController::class, 'index']);
+Route::get('/tests', [TestController::class, 'index']);
+Route::get('/listening-tests', [ListeningTestController::class, 'index']);
 // Protected routes (cần authentication)
 Route::middleware('auth:api')->group(function () {
     // Auth user info
@@ -40,23 +44,23 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/auth/stats', [AuthController::class, 'getUserStats']);
 
     // Lesson routes
-    Route::get('/lessons', [LessonController::class, 'index']);
+
     Route::get('/lessons/stats', [LessonController::class, 'getStats']);
     Route::get('/lessons/{id}', [LessonController::class, 'show']);
     Route::post('/lessons/{id}/progress', [LessonController::class, 'updateProgress']);
     Route::post('/lessons/{id}/complete', [LessonController::class, 'complete']);
     // Quiz routes
-    Route::get('/quizzes', [QuizController::class, 'index']);
+
     Route::get('/quizzes/{id}', [QuizController::class, 'show']);
     Route::post('/quizzes/{id}/submit', [QuizController::class, 'submit']);
     Route::get('/user/quiz-results', [QuizController::class, 'getUserResults']);
     //Test routes
-    Route::get('/tests', [TestController::class, 'index']);
+
     Route::get('/tests/{id}', [TestController::class, 'show']);
     Route::post('/tests/{id}/submit', [TestController::class, 'submitTest']);
     Route::get('/tests/{id}/results', [TestController::class, 'getUserResults']);
 
-    Route::get('/listening-tests', [ListeningTestController::class, 'index']);
+
 
     // Get specific listening test with sections and questions
     Route::get('/listening-tests/{id}', [ListeningTestController::class, 'show']);

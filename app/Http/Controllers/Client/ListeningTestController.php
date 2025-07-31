@@ -9,19 +9,55 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class ListeningTestController extends Controller
 {
     /**
      * Get all active listening tests
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
             $tests = ListeningTest::where('is_active', true)
-                ->select('id', 'title', 'description', 'type', 'total_questions', 'time_limit', 'passing_score', 'created_at')
+                ->with(['sections.questions']) // eager load questions qua sections
+                ->select('id', 'title', 'description', 'type', 'time_limit', 'passing_score', 'created_at')
                 ->orderBy('created_at', 'desc')
                 ->get();
+            $user = null;
+            $token = $request->bearerToken();
+            if ($token) {
+                try {
+                    // Nếu dùng JWT
+                    $user = JWTAuth::parseToken()->authenticate();
+                } catch (\Exception $e) {
+                    // Token invalid, continue as guest
+                    $user = null;
+                }
+            }
+            $tests->transform(function ($test) use ($user) {
+                // Tính tổng câu hỏi
+                $totalQuestions = $test->sections->sum(function ($section) {
+                    return $section->questions->count();
+                });
+                $test->total_questions = $totalQuestions;
+
+                // Lấy kết quả gần nhất của user nếu có
+                if ($user) {
+                    $latestResult = $test->results()
+                        ->where('user_id', $user->id)
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+
+                    $test->user_latest_result = $latestResult ? [
+                        'score' => $latestResult->score,
+                        'completed_at' => $latestResult->created_at,
+                        'passed' => (bool) $latestResult->passed
+                    ] : null;
+                }
+
+                return $test;
+            });
 
             return response()->json([
                 'success' => true,
@@ -35,6 +71,7 @@ class ListeningTestController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * Get specific listening test with sections and questions
@@ -167,9 +204,18 @@ class ListeningTestController extends Controller
             // Check answers
             foreach ($request->answers as $answer) {
                 $question = $allQuestions->firstWhere('id', $answer['question_id']);
+                $isCorrect = $question->correct_answer === $answer['selected_answer'];
                 if ($question && $question->correct_answer === $answer['selected_answer']) {
                     $correctAnswers++;
                 }
+                $detailedResults[] = [
+                    'question_id' => $question->id,
+                    'question' => $question->question,
+                    'options' => is_string($question->options) ? json_decode($question->options, true) : $question->options,
+                    'user_answer' => $answer['selected_answer'],
+                    'correct_answer' => $question->correct_answer,
+                    'is_correct' => $isCorrect,
+                ];
             }
 
             $score = $totalQuestions > 0 ? ($correctAnswers / $totalQuestions) * 100 : 0;
@@ -182,7 +228,7 @@ class ListeningTestController extends Controller
                 'score' => $score,
                 'total_questions' => $totalQuestions,
                 'correct_answers' => $correctAnswers,
-                'time_taken' => $request->time_taken,
+                //'time_taken' => $request->time_taken,
                 'answers' => json_encode($request->answers),
                 'passed' => $isPassed
             ]);
@@ -197,8 +243,9 @@ class ListeningTestController extends Controller
                     'is_passed' => $isPassed,
                     'correct_answers' => $correctAnswers,
                     'total_questions' => $totalQuestions,
-                    'result_id' => $result->id
-                ]
+                    'result_id' => $result->id,
+                    'detailed_results' => $detailedResults
+                ],
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
