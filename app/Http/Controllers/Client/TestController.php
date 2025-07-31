@@ -9,6 +9,7 @@ use App\Services\TestService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Controller;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class TestController extends Controller
 {
@@ -20,10 +21,45 @@ class TestController extends Controller
   }
 
   // Lấy danh sách các test available
-  public function index()
+  public function index(Request $request)
   {
     try {
       $tests = Test::where('is_active', true)->get();
+
+      // Thử authenticate từ token
+      $user = null;
+      $token = $request->bearerToken();
+
+      if ($token) {
+        try {
+          // Nếu dùng JWT
+          $user = JWTAuth::parseToken()->authenticate();
+        } catch (\Exception $e) {
+          // Token invalid, continue as guest
+          $user = null;
+        }
+      }
+
+      // Nếu có user, lấy kết quả gần nhất
+      if ($user) {
+        $userId = $user->id;
+
+        $tests->transform(function ($test) use ($userId) {
+          $latestResult = UserTestResult::where('user_id', $userId)
+            ->where('test_id', $test->id)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+          $test->user_latest_result = $latestResult ? [
+            'score' => $latestResult->score,
+            'completed_at' => $latestResult->created_at,
+            'passed' => (bool) $latestResult->passed
+          ] : null;
+
+          return $test;
+        });
+      }
+
       return response()->json($tests);
     } catch (\Exception $e) {
       return response()->json([
