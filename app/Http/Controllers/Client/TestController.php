@@ -111,9 +111,9 @@ class TestController extends Controller
   {
     try {
       $request->validate([
-        'answers' => 'required|array',
-        'answers.*.question_id' => 'required|integer',
-        'answers.*.selected_answer' => 'required',
+        'answers' => 'nullable|array',
+        'answers.*.question_id' => 'nullable|integer',
+        'answers.*.selected_answer' => 'nullable',
       ]);
 
       $userId = Auth::id();
