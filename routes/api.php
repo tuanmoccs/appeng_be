@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\Route;
 // Authentication routes (public)
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
+    Route::get('/{provider}', [AuthController::class, 'redirectToProvider']);
+    Route::get('/{provider}/callback', [AuthController::class, 'handleProviderCallback']);
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/send-reset-otp', [AuthController::class, 'sendResetOTP']);

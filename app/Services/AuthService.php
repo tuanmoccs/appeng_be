@@ -54,6 +54,57 @@ class AuthService
         ];
     }
 
+    public function handleOAuthLogin(string $provider, $providerUser): array
+    {
+        // Kiểm tra user đã tồn tại với provider này chưa
+        $user = User::where('provider', $provider)
+            ->where('provider_id', $providerUser->getId())
+            ->first();
+
+        if ($user) {
+            // User đã tồn tại, cập nhật thông tin
+            $user->update([
+                'name' => $providerUser->getName() ?? $user->name,
+                'avatar' => $providerUser->getAvatar() ?? $user->avatar,
+                'last_login_at' => now()
+            ]);
+        } else {
+            // Kiểm tra email đã tồn tại chưa (user có thể đã đăng ký bằng email/password)
+            $existingUser = User::where('email', $providerUser->getEmail())->first();
+
+            if ($existingUser) {
+                // Link OAuth account với existing user
+                $existingUser->update([
+                    'provider' => $provider,
+                    'provider_id' => $providerUser->getId(),
+                    'avatar' => $providerUser->getAvatar() ?? $existingUser->avatar,
+                    'last_login_at' => now(),
+                    'email_verified_at' => now()
+                ]);
+                $user = $existingUser;
+            } else {
+                // Tạo user mới
+                $user = User::create([
+                    'name' => $providerUser->getName() ?? 'User',
+                    'email' => $providerUser->getEmail(),
+                    'password' => Hash::make(Str::random(32)), // Random password
+                    'provider' => $provider,
+                    'provider_id' => $providerUser->getId(),
+                    'avatar' => $providerUser->getAvatar(),
+                    'email_verified_at' => now(),
+                    'last_login_at' => now()
+                ]);
+            }
+        }
+
+        // Tạo JWT token
+        $token = JWTAuth::fromUser($user);
+
+        return [
+            'user' => $user,
+            'token' => $token
+        ];
+    }
     /**
      * Handle user registration
      */

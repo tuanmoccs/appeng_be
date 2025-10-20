@@ -15,6 +15,7 @@ use Illuminate\Auth\Events\Validated;
 use Illuminate\Support\Facades\Validator;
 use App\Mail\ResetPasswordOtpMail;
 use Illuminate\Support\Facades\Mail;
+use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
 {
@@ -70,7 +71,64 @@ class AuthController extends Controller
             ], 400);
         }
     }
+    /**
+     * Social login
+     */
 
+    public function redirectToProvider(string $provider): JsonResponse
+    {
+        try {
+            $this->validateProvider($provider);
+
+            $url = Socialite::driver($provider)
+                ->stateless()
+                ->redirect()
+                ->getTargetUrl();
+
+            return response()->json([
+                'success' => true,
+                'url' => $url
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    public function handleProviderCallback(string $provider, Request $request)
+    {
+        try {
+            $this->validateProvider($provider);
+
+            // Get user info from provider
+            $providerUser = Socialite::driver($provider)
+                ->stateless()
+                ->user();
+
+            // Login or register user
+            $result = $this->authService->handleOAuthLogin($provider, $providerUser);
+
+            // Redirect to frontend with token
+            $frontendUrl = env('FRONTEND_URL', 'http://localhost:5137');
+            $redirectUrl = $frontendUrl . '/oauth/callback?token=' . $result['token'] . '&user=' . urlencode(json_encode($result['user']));
+
+            return redirect($redirectUrl);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    private function validateProvider(string $provider): void
+    {
+        if (!in_array($provider, ['google', 'facebook'])) {
+            throw new Exception('Provider không được hỗ trợ');
+        }
+    }
     /**
      * Get authenticated user info
      */
