@@ -1,8 +1,11 @@
 <?php
+
 namespace App\Http\Requests;
+
 use Illuminate\Foundation\Http\FormRequest;
 
-class LoginRequest extends FormRequest{
+class LoginRequest extends FormRequest
+{
     public function authorize(): bool
     {
         return true;
@@ -11,9 +14,11 @@ class LoginRequest extends FormRequest{
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email', 'max:255'],
-            'password' => ['required', 'string', 'min:6'],
-            'remember' => ['boolean']
+            'email' => 'required|email',
+            'password' => 'required|string',
+            'remember' => 'boolean',
+            'otp_code' => 'nullable|string',
+            // 'captcha_token' => 'nullable|string', // Commented out
         ];
     }
 
@@ -23,7 +28,6 @@ class LoginRequest extends FormRequest{
             'email.required' => 'Vui lòng nhập email',
             'email.email' => 'Email không hợp lệ',
             'password.required' => 'Vui lòng nhập mật khẩu',
-            'password.min' => 'Mật khẩu phải có ít nhất 6 ký tự',
         ];
     }
 }

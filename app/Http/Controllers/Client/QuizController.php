@@ -57,6 +57,43 @@ class QuizController extends Controller
         }
         return response()->json($quizzes);
     }
+    public function GetLastestQuiz(Request $request)
+    {
+        $quizzes = Quiz::with('lesson:id,title')->orderBy('created_at', 'desc')->limit(3)->get();
+        $user = null;
+        $token = $request->bearerToken();
+
+        if ($token) {
+            try {
+                // Nếu dùng JWT
+                $user = JWTAuth::parseToken()->authenticate();
+            } catch (\Exception $e) {
+                // Token invalid, continue as guest
+                $user = null;
+            }
+        }
+
+        // Nếu có user, lấy kết quả gần nhất
+        if ($user) {
+            $userId = $user->id;
+
+            $quizzes->transform(function ($quiz) use ($userId) {
+                $latestResult = UserQuizResult::where('user_id', $userId)
+                    ->where('quiz_id', $quiz->id)
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                $quiz->user_latest_result = $latestResult ? [
+                    'score' => $latestResult->score,
+                    'completed_at' => $latestResult->created_at,
+                    'total_questions' => $latestResult->total_questions
+                ] : null;
+
+                return $quiz;
+            });
+        }
+        return response()->json($quizzes);
+    }
 
     public function show($id)
     {

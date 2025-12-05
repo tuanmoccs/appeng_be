@@ -14,12 +14,18 @@ use Exception;
 use Illuminate\Auth\Events\Validated;
 use Illuminate\Support\Facades\Validator;
 use App\Mail\ResetPasswordOtpMail;
+use App\Models\LoginAttempt;
+use App\Models\RefreshToken;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Socialite\Facades\Socialite;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
     protected $authService;
+    // protected $captchaService;
 
     public function __construct(AuthService $authService)
     {
@@ -33,19 +39,239 @@ class AuthController extends Controller
     {
         try {
             $credentials = $request->validated();
+            $email = $credentials['email'];
+            $ipAddress = $request->ip();
+
+            // Log to debug xem có nhận được otp_code không
+            Log::info('Login attempt', [
+                'email' => $email,
+                'has_otp_code' => isset($credentials['otp_code']),
+                'otp_code' => $credentials['otp_code'] ?? 'NOT PROVIDED'
+            ]);
+
+            if (LoginAttempt::isLocked($email, $ipAddress, 5)) {
+                $lockUntil = LoginAttempt::getLockUntil($email, $ipAddress);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tài khoản đã bị khóa do đăng nhập sai quá 5 lần. Vui lòng thử lại sau 15 phút.',
+                    'locked' => true,
+                    'lock_until' => $lockUntil ? $lockUntil->toISOString() : null,
+                    'attempts' => 5
+                ], 423);
+            }
+
+            $failedAttempts = LoginAttempt::getFailedAttempts($email, $ipAddress);
+
+            /*
+            if ($failedAttempts >= 3) {
+                if (!isset($credentials['captcha_token'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Vui lòng xác nhận CAPTCHA',
+                        'require_captcha' => true,
+                        'attempts' => $failedAttempts
+                    ], 400);
+                }
+
+                $captchaService = app(CaptchaService::class);
+                if (!$captchaService->verify($credentials['captcha_token'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'CAPTCHA không hợp lệ',
+                        'require_captcha' => true
+                    ], 400);
+                }
+            }
+            */
+
             $result = $this->authService->login($credentials);
+            $user = $result['user'];
+            $token = $result['token'];
+
+            $refreshTokenString = Str::random(64);
+            $deviceInfo = $request->header('User-Agent'); //User-Agent là thông tin trình duyệt / thiết bị gửi lên server trong mỗi request.
+
+            RefreshToken::generate($user->id, $deviceInfo);
+
+            // Log to debug user 2FA status
+            Log::info('User 2FA status', [
+                'email' => $email,
+                'two_factor_enabled' => $user->two_factor_enabled,
+                'has_otp_code' => isset($credentials['otp_code']),
+                'access_token_length' => strlen($token),
+                'refresh_token_length' => strlen($refreshTokenString),
+                'access_token_expires_in' => config('jwt.ttl', 60) . ' minutes'
+            ]);
+
+            if ($user->two_factor_enabled) {
+                if (!isset($credentials['otp_code']) || empty($credentials['otp_code'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Vui lòng nhập mã xác thực 2FA',
+                        'require_2fa' => true,
+                        'email' => $email
+                    ], 400);
+                }
+
+                $twoFactorService = app(\App\Services\TwoFactorService::class);
+                $secret = decrypt($user->two_factor_secret);
+
+                Log::info('Verifying OTP', [
+                    'email' => $email,
+                    'otp_code' => $credentials['otp_code'],
+                    'otp_length' => strlen($credentials['otp_code'])
+                ]);
+
+                if (strlen($credentials['otp_code']) > 6) {
+                    $recoveryCodes = $twoFactorService->decryptRecoveryCodes(
+                        $user->two_factor_recovery_codes
+                    );
+
+                    if (!$recoveryCodes->contains($credentials['otp_code'])) {
+                        LoginAttempt::recordAttempt($email, $ipAddress, false);
+                        $attempts = LoginAttempt::getFailedAttempts($email, $ipAddress);
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Recovery code không hợp lệ',
+                            'require_2fa' => true,
+                            'attempts' => $attempts
+                        ], 400);
+                    }
+
+                    $recoveryCodes = $recoveryCodes->reject(function ($code) use ($credentials) {
+                        return $code === $credentials['otp_code'];
+                    });
+
+                    $user->two_factor_recovery_codes = $twoFactorService->encryptRecoveryCodes($recoveryCodes);
+                    $user->save();
+                } else {
+                    if (!$twoFactorService->verifyCode($secret, $credentials['otp_code'])) {
+                        LoginAttempt::recordAttempt($email, $ipAddress, false);
+                        $attempts = LoginAttempt::getFailedAttempts($email, $ipAddress);
+                        Log::warning('OTP verification failed', ['email' => $email]);
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Mã OTP không chính xác',
+                            'require_2fa' => true,
+                            'attempts' => $attempts
+                        ], 400);
+                    }
+                }
+            }
+
+            LoginAttempt::recordAttempt($email, $ipAddress, true);
+            LoginAttempt::clearAttempts($email, $ipAddress);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Đăng nhập thành công',
                 'user' => $result['user'],
-                'token' => $result['token']
+                'token' => $result['token'],
+                'refresh_token' => $refreshTokenString,
+                'expires_in' => config('jwt.ttl', 60) * 60, // seconds
+                'token_type' => 'Bearer'
             ], 200);
         } catch (Exception $e) {
+            $email = $request->input('email');
+            $ipAddress = $request->ip();
+
+            LoginAttempt::recordAttempt($email, $ipAddress, false);
+            $failedAttempts = LoginAttempt::getFailedAttempts($email, $ipAddress);
+
+            $message = $e->getMessage();
+            $locked = $failedAttempts >= 5;
+            $lockUntil = null;
+
+            if ($locked) {
+                $message = 'Tài khoản đã bị khóa do đăng nhập sai quá 5 lần. Vui lòng thử lại sau 15 phút.';
+                $lockUntil = LoginAttempt::getLockUntil($email, $ipAddress);
+            } else {
+                $message .= ' (Còn ' . (5 - $failedAttempts) . ' lần thử)';
+            }
+
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
-            ], 401);
+                'message' => $message,
+                'locked' => $locked,
+                'lock_until' => $lockUntil ? $lockUntil->toISOString() : null,
+                'attempts' => $failedAttempts
+            ], $locked ? 423 : 401);
+        }
+    }
+
+    public function refreshToken(Request $request): JsonResponse
+    {
+        try {
+            $refreshToken = $request->input('refresh_token');
+
+            if (!$refreshToken) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Refresh token không được cung cấp'
+                ], 400);
+            }
+
+            Log::info('Refresh token attempt', [
+                'refresh_token_length' => strlen($refreshToken),
+                'ip' => $request->ip()
+            ]);
+
+            // Verify refresh token
+            $tokenRecord = RefreshToken::verify($refreshToken);
+
+            if (!$tokenRecord) {
+                Log::warning('Invalid or expired refresh token', [
+                    'refresh_token_length' => strlen($refreshToken)
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Refresh token không hợp lệ hoặc đã hết hạn'
+                ], 401);
+            }
+
+            $user = $tokenRecord->user;
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Người dùng không tồn tại'
+                ], 404);
+            }
+
+            // Tạo access token mới
+            $newAccessToken = JWTAuth::fromUser($user);
+
+            // Tạo refresh token mới (rotation)
+            $tokenRecord->delete();
+            $newRefreshTokenString = Str::random(64);
+            RefreshToken::generate($user->id, $request->header('User-Agent'));
+
+            Log::info('Token refreshed successfully', [
+                'user_id' => $user->id,
+                'old_refresh_token_id' => $tokenRecord->id,
+                'new_access_token_length' => strlen($newAccessToken),
+                'new_refresh_token_length' => strlen($newRefreshTokenString)
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Token đã được làm mới',
+                'token' => $newAccessToken,
+                'refresh_token' => $newRefreshTokenString,
+                'expires_in' => config('jwt.ttl', 60) * 60,
+                'token_type' => 'Bearer'
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Refresh token error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Có lỗi xảy ra khi làm mới token'
+            ], 500);
         }
     }
 
@@ -71,6 +297,7 @@ class AuthController extends Controller
             ], 400);
         }
     }
+
     /**
      * Social login
      */
@@ -102,15 +329,12 @@ class AuthController extends Controller
         try {
             $this->validateProvider($provider);
 
-            // Get user info from provider
             $providerUser = Socialite::driver($provider)
                 ->stateless()
                 ->user();
 
-            // Login or register user
             $result = $this->authService->handleOAuthLogin($provider, $providerUser);
 
-            // Redirect to frontend with token
             $frontendUrl = env('FRONTEND_URL', 'http://localhost:5137');
             $redirectUrl = $frontendUrl . '/oauth/callback?token=' . $result['token'] . '&user=' . urlencode(json_encode($result['user']));
 
@@ -129,6 +353,7 @@ class AuthController extends Controller
             throw new Exception('Provider không được hỗ trợ');
         }
     }
+
     /**
      * Get authenticated user info
      */
@@ -155,19 +380,39 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         try {
-            $this->authService->logout($request->user());
+            $user = $request->user();
+
+            Log::info('Logout attempt', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'ip' => $request->ip()
+            ]);
+
+            // Gọi service để xử lý logout
+            $this->authService->logout($user);
+
+            Log::info('Logout successful', [
+                'user_id' => $user->id,
+                'email' => $user->email
+            ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Đăng xuất thành công'
             ], 200);
         } catch (Exception $e) {
+            Log::error('Logout error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Có lỗi xảy ra khi đăng xuất'
             ], 500);
         }
     }
+
     public function resetPasswordWithOTP(Request $request): JsonResponse
     {
         try {
@@ -230,6 +475,7 @@ class AuthController extends Controller
             ], 400);
         }
     }
+
     /**
      * Forgot password
      */
@@ -355,6 +601,7 @@ class AuthController extends Controller
             ], 500);
         }
     }
+
     public function getUserStats(Request $request): JsonResponse
     {
         try {

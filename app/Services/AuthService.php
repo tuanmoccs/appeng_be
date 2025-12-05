@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Exception;
 use App\Mail\ResetPasswordOtpMail;
+use App\Models\RefreshToken;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 
@@ -29,21 +30,12 @@ class AuthService
         $password = $credentials['password'];
         $remember = $credentials['remember'] ?? false;
 
-        // Find user by email
         $user = User::where('email', $email)->first();
 
         if (!$user || !Hash::check($password, $user->password)) {
             throw new Exception('Email hoặc mật khẩu không đúng');
         }
-
-        //        if (!$user->is_active) {
-        //            throw new Exception('Tài khoản đã bị khóa');
-        //        }
-
-        // Create JWT token
         $token = JWTAuth::fromUser($user);
-
-        // Update last login
         $user->update([
             'last_login_at' => now()
         ]);
@@ -138,8 +130,33 @@ class AuthService
      */
     public function logout(User $user): void
     {
-        // Invalidate JWT token
-        JWTAuth::invalidate(JWTAuth::getToken());
+        try {
+            // Xóa TẤT CẢ refresh tokens của user (logout tất cả thiết bị)
+            $deletedCount = RefreshToken::where('user_id', $user->id)->delete();
+
+            Log::info('Refresh tokens deleted', [
+                'user_id' => $user->id,
+                'deleted_count' => $deletedCount
+            ]);
+
+            //Invalidate JWT access token hiện tại
+            try {
+                JWTAuth::invalidate(JWTAuth::getToken());
+                Log::info('JWT token invalidated', ['user_id' => $user->id]);
+            } catch (\Exception $e) {
+                // Nếu token đã invalid hoặc không có token, vẫn tiếp tục
+                Log::warning('JWT invalidation failed (may be already invalid)', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Logout service error', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
     }
 
     /**
@@ -150,7 +167,7 @@ class AuthService
         $user = User::where('email', $email)->first();
 
         if (!$user) {
-            throw new Exception('Không tìm thấy người dùng với email này');
+            throw new Exception('Không tìm th���y người dùng với email này');
         }
 
         $status = Password::sendResetLink(['email' => $email]);
