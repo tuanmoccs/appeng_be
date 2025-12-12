@@ -14,9 +14,11 @@ class Lesson extends Model
         'title',
         'description',
         'content',
+        'quiz',
         'level',
         'duration',
         'order',
+        'is_locked',
     ];
 
     /**
@@ -26,5 +28,23 @@ class Lesson extends Model
      */
     protected $casts = [
         'content' => 'array',
+        'quiz' => 'array',
+        'is_locked' => 'boolean',
+        'duration' => 'integer',
+        'order' => 'integer',
     ];
+    public function hasQuiz()
+    {
+        return !empty($this->quiz) && isset($this->quiz['questions']);
+    }
+
+    public function getQuizPassingScore()
+    {
+        return $this->quiz['passing_score'] ?? 80;
+    }
+
+    public function countQuizQuestions()
+    {
+        return count($this->quiz['questions'] ?? []);
+    }
 }

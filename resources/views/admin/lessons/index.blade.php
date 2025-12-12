@@ -42,8 +42,8 @@
                             </span>
                         </td>
                         <td>{{ $lesson->duration }} phút</td>
-                        <td>{{ $lesson->words()->count() }}</td>
-                        <td>{{ $lesson->quizzes()->count() }}</td>
+                        {{-- <td>{{ $lesson->words()->count() }}</td> --}}
+                        {{-- <td>{{ $lesson->quizzes()->count() }}</td> --}}
                         <td>{{ $lesson->created_at->format('d/m/Y') }}</td>
                         <td>
                             <div class="btn-group" role="group">

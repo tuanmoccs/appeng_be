@@ -20,6 +20,9 @@ class Test extends Model
     ];
 
     protected $casts = [
+        'total_questions' => 'integer',
+        'time_limit' => 'integer',
+        'passing_score' => 'integer',
         'is_active' => 'boolean',
     ];
 }

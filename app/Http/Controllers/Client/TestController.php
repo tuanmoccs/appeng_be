@@ -20,30 +20,24 @@ class TestController extends Controller
     $this->testService = $testService;
   }
 
-  // Lấy danh sách các test available
   public function index(Request $request)
   {
     try {
       $tests = Test::where('is_active', true)->get();
 
-      // Thử authenticate từ token
       $user = null;
       $token = $request->bearerToken();
 
       if ($token) {
         try {
-          // Nếu dùng JWT
           $user = JWTAuth::parseToken()->authenticate();
         } catch (\Exception $e) {
-          // Token invalid, continue as guest
           $user = null;
         }
       }
 
-      // Nếu có user, lấy kết quả gần nhất
       if ($user) {
         $userId = $user->id;
-
         $tests->transform(function ($test) use ($userId) {
           $latestResult = UserTestResult::where('user_id', $userId)
             ->where('test_id', $test->id)
@@ -69,81 +63,90 @@ class TestController extends Controller
     }
   }
 
-  public function GetLastestTest(Request $request)
-  {
-    try {
-      $tests = Test::where('is_active', true)->orderBy('created_at', 'desc')->limit(3)->get();
-
-      // Thử authenticate từ token
-      $user = null;
-      $token = $request->bearerToken();
-
-      if ($token) {
-        try {
-          // Nếu dùng JWT
-          $user = JWTAuth::parseToken()->authenticate();
-        } catch (\Exception $e) {
-          // Token invalid, continue as guest
-          $user = null;
-        }
-      }
-
-      // Nếu có user, lấy kết quả gần nhất
-      if ($user) {
-        $userId = $user->id;
-
-        $tests->transform(function ($test) use ($userId) {
-          $latestResult = UserTestResult::where('user_id', $userId)
-            ->where('test_id', $test->id)
-            ->orderBy('created_at', 'desc')
-            ->first();
-
-          $test->user_latest_result = $latestResult ? [
-            'score' => $latestResult->score,
-            'completed_at' => $latestResult->created_at,
-            'passed' => (bool) $latestResult->passed
-          ] : null;
-
-          return $test;
-        });
-      }
-
-      return response()->json($tests);
-    } catch (\Exception $e) {
-      return response()->json([
-        'success' => false,
-        'message' => 'Không thể tải danh sách test'
-      ], 500);
-    }
-  }
-  // Lấy chi tiết một test bao gồm các questions
   public function show($id)
   {
     try {
-      $test = Test::with(['questions' => function ($query) {
-        $query->orderBy('order', 'asc');
-      }])->findOrFail($id);
-
-      // Format lại options để FE dễ xử lý
-      $test->questions->transform(function ($question) {
-        // Kiểm tra xem options đã là array chưa
-        if (is_string($question->options)) {
-          $question->options = json_decode($question->options, true);
+      $test = Test::with([
+        'passages' => function ($query) {
+          $query->orderBy('order', 'asc')
+            ->with(['questions' => function ($q) {
+              $q->orderBy('order', 'asc');
+            }]);
+        },
+        'standaloneQuestions' => function ($query) {
+          $query->orderBy('order', 'asc');
         }
+      ])->findOrFail($id);
 
-        // Nếu decode thất bại hoặc không phải array, set default
-        if (!is_array($question->options)) {
-          $question->options = [];
+      // Format data cho frontend
+      $formattedTest = [
+        'id' => $test->id,
+        'title' => $test->title,
+        'description' => $test->description,
+        'type' => $test->type,
+        'total_questions' => $test->total_questions,
+        'time_limit' => $test->time_limit,
+        'passing_score' => $test->passing_score,
+        'is_active' => $test->is_active,
+        'sections' => []
+      ];
+
+      // Thêm standalone questions
+      if ($test->standaloneQuestions->isNotEmpty()) {
+        foreach ($test->standaloneQuestions as $question) {
+          $formattedTest['sections'][] = [
+            'type' => 'standalone',
+            'order' => $question->order,
+            'question' => [
+              'id' => $question->id,
+              'question' => $question->question,
+              'options' => is_string($question->options)
+                ? json_decode($question->options, true)
+                : $question->options,
+              'difficulty' => $question->difficulty,
+              'order' => $question->order
+            ]
+          ];
         }
+      }
 
-        return $question;
+      // Thêm passages với questions
+      if ($test->passages->isNotEmpty()) {
+        foreach ($test->passages as $passage) {
+          $passageQuestions = [];
+          foreach ($passage->questions as $question) {
+            $passageQuestions[] = [
+              'id' => $question->id,
+              'question' => $question->question,
+              'options' => is_string($question->options)
+                ? json_decode($question->options, true)
+                : $question->options,
+              'difficulty' => $question->difficulty,
+              'order' => $question->order
+            ];
+          }
+
+          $formattedTest['sections'][] = [
+            'type' => 'passage',
+            'order' => $passage->order,
+            'passage' => [
+              'id' => $passage->id,
+              'title' => $passage->title,
+              'content' => $passage->content
+            ],
+            'questions' => $passageQuestions
+          ];
+        }
+      }
+
+      // Sắp xếp sections theo order
+      usort($formattedTest['sections'], function ($a, $b) {
+        return $a['order'] - $b['order'];
       });
 
       return response()->json([
         'success' => true,
-        'test' => $test,
-        'time_limit' => $test->time_limit,
-        'total_questions' => $test->total_questions,
+        'test' => $formattedTest
       ]);
     } catch (\Exception $e) {
       return response()->json([
@@ -153,7 +156,6 @@ class TestController extends Controller
     }
   }
 
-  // Submit kết quả test
   public function submitTest(Request $request, $testId)
   {
     try {
@@ -178,7 +180,6 @@ class TestController extends Controller
     }
   }
 
-  // Lấy kết quả test của user
   public function getUserResults($testId)
   {
     try {

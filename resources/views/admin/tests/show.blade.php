@@ -44,6 +44,9 @@
                             <a href="{{ route('admin.tests.questions', $test) }}" class="btn btn-warning">
                                 <i class="fas fa-question"></i> Câu hỏi
                             </a>
+                            <a href="{{ route('admin.tests.passages.index', $test) }}" class="btn btn-warning">
+                                <i class="fas fa-question"></i> Bài đọc
+                            </a>
                             <form action="{{ route('admin.tests.destroy', $test) }}" method="POST" class="d-inline">
                                 @csrf
                                 @method('DELETE')

@@ -1,11 +1,14 @@
 <?php
+
 namespace App\Models\Traits\Relation;
 
 use App\Models\Quiz;
 use App\Models\UserLessonProgress;
+use App\Models\UserLessonQuizResult;
 use App\Models\Word;
 
-trait LessonRelation{
+trait LessonRelation
+{
     /**
      * Get the words for the lesson.
      */
@@ -17,10 +20,10 @@ trait LessonRelation{
     /**
      * Get the quizzes for the lesson.
      */
-    public function quizzes()
-    {
-        return $this->hasMany(Quiz::class);
-    }
+    // public function quizzes()
+    // {
+    //     return $this->hasMany(Quiz::class);
+    // }
 
     /**
      * Get the progress records for the lesson.
@@ -28,5 +31,9 @@ trait LessonRelation{
     public function progress()
     {
         return $this->hasMany(UserLessonProgress::class);
+    }
+    public function quizResults()
+    {
+        return $this->hasMany(UserLessonQuizResult::class);
     }
 }

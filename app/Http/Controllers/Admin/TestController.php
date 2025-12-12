@@ -11,7 +11,7 @@ class TestController extends Controller
 {
   public function index()
   {
-    $tests = Test::withCount('questions')->paginate(10);
+    $tests = Test::withCount(['questions', 'passages'])->paginate(10);
     return view('admin.tests.index', compact('tests'));
   }
 
@@ -39,7 +39,7 @@ class TestController extends Controller
 
   public function show(Test $test)
   {
-    $test->load(['questions', 'results.user']);
+    $test->load(['questions', 'passages.questions', 'results.user']);
     return view('admin.tests.show', compact('test'));
   }
 
@@ -73,15 +73,17 @@ class TestController extends Controller
       ->with('success', 'Bài test đã được xóa thành công!');
   }
 
+  // Quản lý questions (standalone)
   public function questions(Test $test)
   {
-    $questions = $test->questions()->orderBy('order')->paginate(20);
-    return view('admin.tests.questions', compact('test', 'questions'));
+    $standaloneQuestions = $test->standaloneQuestions()->paginate(20);
+    return view('admin.tests.questions', compact('test', 'standaloneQuestions'));
   }
 
   public function createQuestion(Test $test)
   {
-    return view('admin.tests.create-question', compact('test'));
+    $nextOrder = $test->standaloneQuestions()->max('order') + 1;
+    return view('admin.tests.create-question', compact('test', 'nextOrder'));
   }
 
   public function storeQuestion(Request $request, Test $test)
@@ -95,7 +97,15 @@ class TestController extends Controller
       'order' => 'required|integer|min:1',
     ]);
 
-    $test->questions()->create($request->all());
+    $test->questions()->create([
+      'type' => 'standalone',
+      'passage_id' => null,
+      'question' => $request->question,
+      'options' => $request->options,
+      'correct_answer' => $request->correct_answer,
+      'difficulty' => $request->difficulty,
+      'order' => $request->order,
+    ]);
 
     return redirect()->route('admin.tests.questions', $test)
       ->with('success', 'Câu hỏi đã được thêm thành công!');

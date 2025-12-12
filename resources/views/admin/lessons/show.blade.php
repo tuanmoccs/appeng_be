@@ -65,14 +65,14 @@
         </div>
     </div>
     
-    <div class="col-md-3 mb-3">
+    {{-- <div class="col-md-3 mb-3">
         <div class="card text-white bg-success">
             <div class="card-body text-center">
                 <h3>{{ $lesson->quizzes()->count() }}</h3>
                 <p class="mb-0">Quiz</p>
             </div>
         </div>
-    </div>
+    </div> --}}
     
     <div class="col-md-3 mb-3">
         <div class="card text-white bg-info">
@@ -197,7 +197,7 @@
             </div>
         </div>
 
-        <div class="card mt-3">
+        {{-- <div class="card mt-3">
             <div class="card-header">
                 <h5>Quiz liên quan</h5>
             </div>
@@ -230,7 +230,7 @@
                     </div>
                 @endif
             </div>
-        </div>
+        </div> --}}
 
         <div class="card mt-3">
             <div class="card-header">

@@ -2,6 +2,7 @@
 
 namespace App\Models\Traits\Relation;
 
+use App\Models\TestPassage;
 use App\Models\TestQuestion;
 use App\Models\UserTestResult;
 use Illuminate\Support\Facades\Auth;
@@ -12,7 +13,16 @@ trait TestRelation
   {
     return $this->hasMany(TestQuestion::class);
   }
-
+  public function passages()
+  {
+    return $this->hasMany(TestPassage::class)->orderBy('order');
+  }
+  public function standaloneQuestions()
+  {
+    return $this->hasMany(TestQuestion::class)
+      ->whereNull('passage_id')
+      ->orderBy('order');
+  }
   public function results()
   {
     return $this->hasMany(UserTestResult::class);

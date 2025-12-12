@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\QuizController;
 use App\Http\Controllers\Admin\ListeningTestController;
 use App\Http\Controllers\Admin\ListeningSectionController;
 use App\Http\Controllers\Admin\ListeningQuestionController;
+use App\Http\Controllers\Admin\PassageController;
 
 /*
 |--------------------------------------------------------------------------
@@ -42,6 +43,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Lessons management
         Route::resource('lessons', LessonController::class);
+        Route::post('lessons', [LessonController::class, 'store'])->name('lessons.store');
 
         // Words management
         Route::resource('words', WordController::class);
@@ -59,12 +61,29 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Tests management
         Route::resource('tests', TestController::class);
-        Route::get('tests/{test}/questions', [TestController::class, 'questions'])->name('tests.questions');
-        Route::get('tests/{test}/questions/create', [TestController::class, 'createQuestion'])->name('tests.questions.create');
-        Route::post('tests/{test}/questions', [TestController::class, 'storeQuestion'])->name('tests.questions.store');
-        Route::get('tests/{test}/questions/{question}/edit', [TestController::class, 'editQuestion'])->name('tests.questions.edit');
-        Route::put('tests/{test}/questions/{question}', [TestController::class, 'updateQuestion'])->name('tests.questions.update');
-        Route::delete('tests/{test}/questions/{question}', [TestController::class, 'destroyQuestion'])->name('tests.questions.destroy');
+        Route::prefix('tests/{test}')->name('tests.')->group(function () {
+            Route::get('questions', [TestController::class, 'questions'])->name('questions');
+            Route::get('questions/create', [TestController::class, 'createQuestion'])->name('questions.create');
+            Route::post('questions', [TestController::class, 'storeQuestion'])->name('questions.store');
+            Route::get('questions/{question}/edit', [TestController::class, 'editQuestion'])->name('questions.edit');
+            Route::put('questions/{question}', [TestController::class, 'updateQuestion'])->name('questions.update');
+            Route::delete('questions/{question}', [TestController::class, 'destroyQuestion'])->name('questions.destroy');
+
+            // Passages Management
+            Route::get('passages', [PassageController::class, 'index'])->name('passages.index');
+            Route::get('passages/create', [PassageController::class, 'create'])->name('passages.create');
+            Route::post('passages', [PassageController::class, 'store'])->name('passages.store');
+            Route::get('passages/{passage}', [PassageController::class, 'show'])->name('passages.show');
+            Route::get('passages/{passage}/edit', [PassageController::class, 'edit'])->name('passages.edit');
+            Route::put('passages/{passage}', [PassageController::class, 'update'])->name('passages.update');
+            Route::delete('passages/{passage}', [PassageController::class, 'destroy'])->name('passages.destroy');
+
+            // Passage Questions
+            Route::get('passages/{passage}/questions/create', [PassageController::class, 'createQuestion'])
+                ->name('passages.create-question');
+            Route::post('passages/{passage}/questions', [PassageController::class, 'storeQuestion'])
+                ->name('passages.store-question');
+        });
         // Listening Tests Management
         Route::resource('listening-tests', ListeningTestController::class);
         Route::get('listening-tests/{test}/sections', [ListeningTestController::class, 'sections'])->name('listening-tests.sections');

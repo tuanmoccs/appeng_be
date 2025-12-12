@@ -18,9 +18,11 @@ class CreateLessonsTable extends Migration
             $table->string('title')->nullable();
             $table->text('description')->nullable();
             $table->json('content')->nullable(); // Lưu nội dung bài học dạng JSON
+            $table->json('quiz')->nullable();
             $table->string('level')->nullable(); // Beginner, Intermediate, Advanced
             $table->integer('duration')->default(0)->nullable(); // Thời gian ước tính để hoàn thành (phút)
             $table->integer('order')->default(0)->nullable(); // Thứ tự hiển thị
+            $table->boolean('is_locked')->default(true);
             $table->timestamps();
         });
     }

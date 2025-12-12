@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateQuizzesTable extends Migration
+class CreateTestPassagesTable extends Migration
 {
     /**
      * Run the migrations.
@@ -13,10 +13,12 @@ class CreateQuizzesTable extends Migration
      */
     public function up()
     {
-        Schema::create('quizzes', function (Blueprint $table) {
+        Schema::create('test_passages', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('test_id')->constrained()->onDelete('cascade');
             $table->string('title')->nullable();
-            $table->text('description')->nullable();
+            $table->text('content'); // Nội dung bài đọc
+            $table->integer('order')->default(0);
             $table->timestamps();
         });
     }
@@ -28,6 +30,6 @@ class CreateQuizzesTable extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('quizzes');
+        Schema::dropIfExists('test_passages');
     }
 }

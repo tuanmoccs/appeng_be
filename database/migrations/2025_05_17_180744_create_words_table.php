@@ -21,7 +21,7 @@ class CreateWordsTable extends Migration
             $table->string('image_url')->nullable();
             $table->string('audio_url')->nullable();
             $table->text('example_sentence')->nullable();
-            $table->foreignId('lesson_id')->nullable()->constrained()->onDelete('set null');
+            // $table->foreignId('lesson_id')->nullable()->constrained()->onDelete('set null');
             $table->timestamps();
         });
     }

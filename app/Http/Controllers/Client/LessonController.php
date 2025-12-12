@@ -34,7 +34,8 @@ class LessonController extends Controller
     } catch (\Exception $e) {
       return response()->json([
         'success' => false,
-        'message' => 'Không thể tải danh sách bài học'
+        'message' => 'Không thể tải danh sách bài học',
+        'error' => $e->getMessage()
       ], 500);
     }
   }
@@ -62,7 +63,8 @@ class LessonController extends Controller
     } catch (\Exception $e) {
       return response()->json([
         'success' => false,
-        'message' => 'Không thể tải chi tiết bài học'
+        'message' => 'Không thể tải chi tiết bài học',
+        'error' => $e->getMessage()
       ], 500);
     }
   }
@@ -109,19 +111,100 @@ class LessonController extends Controller
   }
 
   /**
-   * Complete lesson
+   * Get quiz for a lesson
    */
-  public function complete($id)
+  public function getQuiz($id)
   {
     try {
       $userId = Auth::id();
-      $result = $this->lessonService->completeLesson($userId, $id);
+      $lesson = Lesson::find($id);
+
+      if (!$lesson) {
+        return response()->json([
+          'success' => false,
+          'message' => 'Không tìm thấy bài học'
+        ], 404);
+      }
+
+      if (!$lesson->hasQuiz()) {
+        return response()->json([
+          'success' => false,
+          'message' => 'Bài học này không có quiz'
+        ], 404);
+      }
+
+      // Check if lesson is locked
+      $lessonData = $this->lessonService->getLessonWithProgress($userId, $id);
+      if ($lessonData['is_locked']) {
+        return response()->json([
+          'success' => false,
+          'message' => 'Bài học bị khóa. Hoàn thành bài học trước đó.'
+        ], 403);
+      }
+
+      // Remove correct answers from quiz (don't send to client)
+      $quiz = $lesson->quiz;
+      $quizForClient = [
+        'title' => $quiz['title'] ?? 'Quiz',
+        'description' => $quiz['description'] ?? '',
+        'time_limit' => $quiz['time_limit'] ?? 15,
+        'passing_score' => $quiz['passing_score'] ?? 80,
+        'total_questions' => count($quiz['questions']),
+        'questions' => array_map(function ($q) {
+          return [
+            'id' => $q['id'],
+            'type' => $q['type'],
+            'question' => $q['question'],
+            'image_url' => $q['image_url'] ?? null,
+            'options' => $q['options'] ?? null,
+            // Don't send correct_answer or explanation
+          ];
+        }, $quiz['questions']),
+      ];
 
       return response()->json([
         'success' => true,
-        'message' => 'Hoàn thành bài học thành công!',
-        'progress' => $result['progress'],
-        'achievements' => $result['achievements'] ?? []
+        'quiz' => $quizForClient
+      ], 200);
+    } catch (\Exception $e) {
+      return response()->json([
+        'success' => false,
+        'message' => 'Không thể tải quiz',
+        'error' => $e->getMessage()
+      ], 500);
+    }
+  }
+
+  /**
+   * Submit quiz answers
+   */
+  public function submitQuiz(Request $request, $id)
+  {
+    try {
+      $validator = Validator::make($request->all(), [
+        'answers' => 'required|array',
+        'time_taken' => 'required|integer|min:0',
+      ]);
+
+      if ($validator->fails()) {
+        return response()->json([
+          'success' => false,
+          'errors' => $validator->errors()
+        ], 422);
+      }
+
+      $userId = Auth::id();
+      $result = $this->lessonService->submitQuiz(
+        $userId,
+        $id,
+        $request->answers,
+        $request->time_taken
+      );
+
+      return response()->json([
+        'success' => true,
+        'message' => $result['is_passed'] ? 'Chúc mừng! Bạn đã đạt quiz!' : 'Bạn chưa đạt. Hãy thử lại!',
+        'result' => $result
       ], 200);
     } catch (\Exception $e) {
       return response()->json([
@@ -147,7 +230,8 @@ class LessonController extends Controller
     } catch (\Exception $e) {
       return response()->json([
         'success' => false,
-        'message' => 'Không thể tải thống kê bài học'
+        'message' => 'Không thể tải thống kê bài học',
+        'error' => $e->getMessage()
       ], 500);
     }
   }

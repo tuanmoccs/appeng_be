@@ -10,7 +10,7 @@ class LessonController extends Controller
 {
   public function index()
   {
-    $lessons = Lesson::withCount(['words', 'quizzes'])
+    $lessons = Lesson::withCount(['quizResults'])
       ->orderBy('order')
       ->paginate(10);
     return view('admin.lessons.index', compact('lessons'));
@@ -30,35 +30,41 @@ class LessonController extends Controller
       'duration' => 'required|integer|min:1',
       'order' => 'required|integer|min:1',
       'content' => 'required|json',
+      'quiz' => 'nullable|json',
     ], [
       'title.required' => 'Vui lòng nhập tiêu đề bài học.',
       'description.required' => 'Vui lòng nhập mô tả bài học.',
       'level.required' => 'Vui lòng chọn cấp độ.',
-      'level.in' => 'Cấp độ không hợp lệ.',
       'duration.required' => 'Vui lòng nhập thời gian.',
-      'duration.min' => 'Thời gian phải lớn hơn 0.',
       'order.required' => 'Vui lòng nhập thứ tự.',
-      'order.min' => 'Thứ tự phải lớn hơn 0.',
       'content.required' => 'Vui lòng nhập nội dung bài học.',
       'content.json' => 'Nội dung phải là JSON hợp lệ.',
+      'quiz.json' => 'Quiz phải là JSON hợp lệ.',
     ]);
 
-    // Kiểm tra cấu trúc JSON
-    $contentRaw = $request->input('content');
-    $contentArray = json_decode($contentRaw, true);
-
+    // Validate content structure
+    $contentArray = json_decode($request->input('content'), true);
     if (!isset($contentArray['sections']) || !is_array($contentArray['sections'])) {
       return back()->withErrors(['content' => 'JSON phải có mảng "sections" hợp lệ.'])->withInput();
     }
 
-    // Lưu bài học với content đã chuẩn hóa
+    // Validate quiz structure if provided
+    $quizArray = null;
+    if ($request->filled('quiz')) {
+      $quizArray = json_decode($request->input('quiz'), true);
+      if (!isset($quizArray['questions']) || !is_array($quizArray['questions'])) {
+        return back()->withErrors(['quiz' => 'Quiz phải có mảng "questions" hợp lệ.'])->withInput();
+      }
+    }
+
     Lesson::create([
       'title' => $request->input('title'),
       'description' => $request->input('description'),
       'level' => $request->input('level'),
       'duration' => $request->input('duration'),
       'order' => $request->input('order'),
-      'content' => json_encode($contentArray, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+      'content' => $contentArray,
+      'quiz' => $quizArray,
     ]);
 
     return redirect()->route('admin.lessons.index')
@@ -68,8 +74,16 @@ class LessonController extends Controller
 
   public function show(Lesson $lesson)
   {
-    $lesson->load(['words', 'quizzes', 'progress.user']);
-    return view('admin.lessons.show', compact('lesson'));
+    $lesson->load(['words', 'progress.user', 'quizResults']);
+
+    // Get quiz statistics
+    $quizStats = [
+      'total_attempts' => $lesson->quizResults()->count(),
+      'passed_attempts' => $lesson->quizResults()->where('is_passed', true)->count(),
+      'average_score' => $lesson->quizResults()->avg('score'),
+    ];
+
+    return view('admin.lessons.show', compact('lesson', 'quizStats'));
   }
 
   public function edit(Lesson $lesson)
@@ -86,35 +100,30 @@ class LessonController extends Controller
       'duration' => 'required|integer|min:1',
       'order' => 'required|integer|min:1',
       'content' => 'required|json',
-    ], [
-      'title.required' => 'Vui lòng nhập tiêu đề bài học.',
-      'description.required' => 'Vui lòng nhập mô tả bài học.',
-      'level.required' => 'Vui lòng chọn cấp độ.',
-      'level.in' => 'Cấp độ không hợp lệ.',
-      'duration.required' => 'Vui lòng nhập thời gian.',
-      'duration.min' => 'Thời gian phải lớn hơn 0.',
-      'order.required' => 'Vui lòng nhập thứ tự.',
-      'order.min' => 'Thứ tự phải lớn hơn 0.',
-      'content.required' => 'Vui lòng nhập nội dung bài học.',
-      'content.json' => 'Nội dung phải là JSON hợp lệ.',
+      'quiz' => 'nullable|json',
     ]);
 
-    // Kiểm tra cấu trúc JSON
-    $contentRaw = $request->input('content');
-    $contentArray = json_decode($contentRaw, true);
-
+    $contentArray = json_decode($request->input('content'), true);
     if (!isset($contentArray['sections']) || !is_array($contentArray['sections'])) {
       return back()->withErrors(['content' => 'JSON phải có mảng "sections" hợp lệ.'])->withInput();
     }
 
-    // Cập nhật dữ liệu bài học
+    $quizArray = null;
+    if ($request->filled('quiz')) {
+      $quizArray = json_decode($request->input('quiz'), true);
+      if (!isset($quizArray['questions']) || !is_array($quizArray['questions'])) {
+        return back()->withErrors(['quiz' => 'Quiz phải có mảng "questions" hợp lệ.'])->withInput();
+      }
+    }
+
     $lesson->update([
       'title' => $request->input('title'),
       'description' => $request->input('description'),
       'level' => $request->input('level'),
       'duration' => $request->input('duration'),
       'order' => $request->input('order'),
-      'content' => json_encode($contentArray, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+      'content' => $contentArray,
+      'quiz' => $quizArray,
     ]);
 
     return redirect()->route('admin.lessons.index')
@@ -124,14 +133,14 @@ class LessonController extends Controller
 
   public function destroy(Lesson $lesson)
   {
-    // Check if lesson has related data
     $wordsCount = $lesson->words()->count();
-    $quizzesCount = $lesson->quizzes()->count();
+    //$quizzesCount = $lesson->quizzes()->count();
     $progressCount = $lesson->progress()->count();
+    $quizResultsCount = $lesson->quizResults()->count();
 
-    if ($wordsCount > 0 || $quizzesCount > 0 || $progressCount > 0) {
+    if ($wordsCount > 0 || $progressCount > 0 || $quizResultsCount > 0) {
       return redirect()->route('admin.lessons.index')
-        ->with('error', "Không thể xóa bài học này vì có {$wordsCount} từ vựng, {$quizzesCount} quiz và {$progressCount} tiến độ học tập liên quan.");
+        ->with('error', "Không thể xóa bài học này vì có dữ liệu liên quan.");
     }
 
     $lesson->delete();

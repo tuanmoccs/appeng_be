@@ -11,7 +11,6 @@ class Quiz extends Model
     use HasFactory, QuizRelation;
     protected $fillable = [
         'title',
-        'description',
-        'lesson_id',
+        'description'
     ];
 }

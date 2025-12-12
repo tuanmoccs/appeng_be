@@ -52,10 +52,16 @@ Route::middleware('auth:api')->group(function () {
 
     // Lesson routes
 
-    Route::get('/lessons/stats', [LessonController::class, 'getStats']);
-    Route::get('/lessons/{id}', [LessonController::class, 'show']);
-    Route::post('/lessons/{id}/progress', [LessonController::class, 'updateProgress']);
-    Route::post('/lessons/{id}/complete', [LessonController::class, 'complete']);
+    Route::prefix('lessons')->group(function () {
+        Route::get('/', [LessonController::class, 'index']);
+        Route::get('/stats', [LessonController::class, 'getStats']);
+        Route::get('/{id}', [LessonController::class, 'show']);
+        Route::post('/{id}/progress', [LessonController::class, 'updateProgress']);
+
+        // Quiz routes
+        Route::get('/{id}/quiz', [LessonController::class, 'getQuiz']);
+        Route::post('/{id}/quiz/submit', [LessonController::class, 'submitQuiz']);
+    });
     // Quiz routes
 
     Route::get('/quizzes/{id}', [QuizController::class, 'show']);
@@ -63,9 +69,12 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/user/quiz-results', [QuizController::class, 'getUserResults']);
     //Test routes
 
-    Route::get('/tests/{id}', [TestController::class, 'show']);
-    Route::post('/tests/{id}/submit', [TestController::class, 'submitTest']);
-    Route::get('/tests/{id}/results', [TestController::class, 'getUserResults']);
+    Route::prefix('tests')->group(function () {
+        Route::get('/', [TestController::class, 'index']);
+        Route::get('/{id}', [TestController::class, 'show']);
+        Route::post('/{testId}/submit', [TestController::class, 'submitTest'])->middleware('auth:api');
+        Route::get('/{testId}/results', [TestController::class, 'getUserResults'])->middleware('auth:api');
+    });
 
 
 
