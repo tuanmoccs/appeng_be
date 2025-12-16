@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Client\AuthController;
+use App\Http\Controllers\Client\ChatController;
 use App\Http\Controllers\Client\QuizController;
 use App\Http\Controllers\Client\WordController;
 use App\Http\Controllers\Client\LessonController;
@@ -91,5 +92,13 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/2fa/confirm', [TwoFactorController::class, 'confirm']);
     Route::post('/2fa/disable', [TwoFactorController::class, 'disable']);
     Route::post('/2fa/recovery-codes', [TwoFactorController::class, 'regenerateRecoveryCodes']);
+
+    Route::prefix('chat')->group(function () {
+        Route::get('/admins', [ChatController::class, 'getAdmins']);
+        Route::get('/conversations', [ChatController::class, 'getConversations']);
+        Route::post('/conversations', [ChatController::class, 'startConversation']);
+        Route::get('/conversations/{conversationId}/messages', [ChatController::class, 'getMessages']);
+        Route::post('/conversations/{conversationId}/messages', [ChatController::class, 'sendMessage']);
+    });
 });
 Route::post('/2fa/verify', [TwoFactorController::class, 'verify']);

@@ -78,6 +78,12 @@
                                 <i class="fas fa-clipboard-list"></i> Listening-Test
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('admin.chat.*') ? 'active' : '' }}" 
+                               href="{{ route('admin.chat.index') }}">
+                                <i class="fas fa-clipboard-list"></i> Chat
+                            </a>
+                        </li>
                     </ul>
 
                     <hr class="text-white">

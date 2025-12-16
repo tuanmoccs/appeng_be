@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AuthController;
+use App\Http\Controllers\Admin\ChatController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LessonController;
 use App\Http\Controllers\Admin\TestController;
@@ -100,6 +101,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('{section}/questions', [ListeningQuestionController::class, 'store'])->name('listening-questions.store');
             Route::put('{section}/questions/{question}', [ListeningQuestionController::class, 'update'])->name('listening-questions.update');
             Route::delete('{section}/questions/{question}', [ListeningQuestionController::class, 'destroy'])->name('listening-questions.destroy');
+        });
+
+        Route::prefix('chat')->name('chat.')->group(function () {
+            Route::get('/', [ChatController::class, 'index'])->name('index');
+            Route::get('/conversations', [ChatController::class, 'getConversations'])->name('conversations');
+            Route::post('/conversations/{conversation}/assign', [ChatController::class, 'assignConversation'])->name('assign');
+            Route::get('/conversations/{conversation}/messages', [ChatController::class, 'getMessages'])->name('messages');
+            Route::post('/conversations/{conversation}/messages', [ChatController::class, 'sendMessage'])->name('send');
         });
         // Listening Questions Management
         //     Route::post('listening-sections/{section}/questions', [ListeningQuestionController::class, 'store'])->name('listening-questions.store');

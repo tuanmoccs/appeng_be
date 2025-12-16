@@ -94,4 +94,14 @@ class Admin extends Authenticatable
     {
         return $this->rememberTokenName ?? 'remember_token';
     }
+
+    public function conversations()
+    {
+        return $this->hasMany(Conversation::class);
+    }
+
+    public function messages()
+    {
+        return $this->morphMany(Message::class, 'sender');
+    }
 }
