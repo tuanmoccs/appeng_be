@@ -24,43 +24,40 @@ class RefreshToken extends Model
     return $this->belongsTo(User::class);
   }
 
-  public static function generate($userId, $deviceInfo = null)
+  public static function generate(int $userId, ?string $deviceInfo = null): array
   {
-    // Xóa các refresh token cũ đã hết hạn
-    self::where('user_id', $userId)
-      ->where('expires_at', '<', now())
-      ->delete();
+    $tokenString = Str::random(64);
 
-    // Giới hạn số lượng refresh token (tối đa 5 thiết bị)
-    $count = self::where('user_id', $userId)->count();
-    if ($count >= 5) {
-      self::where('user_id', $userId)
-        ->orderBy('created_at', 'asc')
-        ->first()
-        ->delete();
-    }
-
-    $token = Str::random(64);
-
-    return self::create([
+    $token = self::create([
       'user_id' => $userId,
-      'token' => hash('sha256', $token),
+      'token' => hash('sha256', $tokenString), // Hash để bảo mật
       'device_info' => $deviceInfo,
-      'expires_at' => Carbon::now()->addDays(30) // 30 ngày
+      'expires_at' => now()->addDays(30), // Refresh token sống 30 ngày
     ]);
+
+    return [
+      'token_string' => $tokenString, // Trả về plain text để gửi cho client
+      'model' => $token
+    ];
   }
 
-  public static function verify($token)
+
+  public static function verify(string $tokenString): ?self
   {
-    $hashedToken = hash('sha256', $token);
+    $hashedToken = hash('sha256', $tokenString);
 
     return self::where('token', $hashedToken)
       ->where('expires_at', '>', now())
       ->first();
   }
 
-  public function isExpired()
+  // ✅ Xóa token cũ của user (giới hạn số device)
+  public static function revokeUserTokens(int $userId, int $keepLatest = 5): void
   {
-    return $this->expires_at < now();
+    self::where('user_id', $userId)
+      ->orderBy('created_at', 'desc')
+      ->skip($keepLatest)
+      ->take(PHP_INT_MAX)
+      ->delete();
   }
 }

@@ -46,6 +46,7 @@ class LoginAttempt extends Model
 
   /**
    * Kiểm tra xem tài khoản có bị khóa không (sai >= maxAttempts lần trong 15 phút)
+   * Fixed to check only by EMAIL, not IP address, so other accounts can still login
    */
   public static function isLocked(string $email, string $ipAddress, int $maxAttempts = 5): bool
   {
@@ -78,15 +79,28 @@ class LoginAttempt extends Model
   {
     self::where('email', $email)
       ->where('ip_address', $ipAddress)
-      ->where('successful', false)
       ->delete();
+  }
+
+  public static function clearAllAttemptsForEmail(string $email): void
+  {
+    self::where('email', $email)->delete();
   }
 
   /**
    * Dọn dẹp các bản ghi cũ hơn 24 giờ
+   * Enhanced cleanup with separate logic for successful attempts
    */
   public static function cleanup(): void
   {
-    self::where('attempted_at', '<', Carbon::now()->subDay())->delete();
+    // Delete failed attempts older than 24 hours
+    self::where('attempted_at', '<', Carbon::now()->subDay())
+      ->where('successful', false)
+      ->delete();
+
+    // Delete successful attempts older than 7 days
+    self::where('attempted_at', '<', Carbon::now()->subDays(7))
+      ->where('successful', true)
+      ->delete();
   }
 }
