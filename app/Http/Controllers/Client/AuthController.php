@@ -43,6 +43,7 @@ class AuthController extends Controller
         try {
             $credentials = $request->validated();
             $email = $credentials['email'];
+            $password = $credentials['password'];
             $ipAddress = $request->ip();
 
             Log::info('Login attempt', [
@@ -51,6 +52,7 @@ class AuthController extends Controller
                 'otp_code' => $credentials['otp_code'] ?? 'NOT PROVIDED'
             ]);
 
+            // ✅ 1. CHECK ACCOUNT LOCK
             if (LoginAttempt::isLocked($email, $ipAddress, 5)) {
                 $lockUntil = LoginAttempt::getLockUntil($email, $ipAddress);
                 $currentAttempts = LoginAttempt::getFailedAttempts($email, $ipAddress);
@@ -63,15 +65,20 @@ class AuthController extends Controller
                 ], 423);
             }
 
-            $failedAttempts = LoginAttempt::getFailedAttempts($email, $ipAddress);
+            // ✅ 2. VERIFY EMAIL & PASSWORD (KHÔNG TẠO TOKEN Ở ĐÂY)
+            $user = User::where('email', $email)->first();
 
-            // ✅ Login và lấy user trước
-            $result = $this->authService->login($credentials);
-            $user = $result['user'];
-            $token = $result['token'];
+            if (!$user || !Hash::check($password, $user->password)) {
+                LoginAttempt::recordAttempt($email, $ipAddress, false);
+                $attempts = LoginAttempt::getFailedAttempts($email, $ipAddress);
+                $remainingAttempts = 5 - $attempts;
 
-            // ✅ Verify 2FA TRƯỚC KHI tạo refresh token
+                throw new Exception("Email hoặc mật khẩu không đúng (Còn {$remainingAttempts} lần thử)");
+            }
+
+            // ✅ 3. CHECK 2FA REQUIREMENT
             if ($user->two_factor_enabled) {
+                // ❌ Nếu chưa có OTP code → Yêu cầu nhập
                 if (!isset($credentials['otp_code']) || empty($credentials['otp_code'])) {
                     return response()->json([
                         'success' => false,
@@ -81,6 +88,7 @@ class AuthController extends Controller
                     ], 400);
                 }
 
+                // ✅ Có OTP code → Verify
                 $twoFactorService = app(\App\Services\TwoFactorService::class);
                 $secret = decrypt($user->two_factor_secret);
 
@@ -90,8 +98,9 @@ class AuthController extends Controller
                     'otp_length' => strlen($credentials['otp_code'])
                 ]);
 
+                // Check if recovery code or regular OTP
                 if (strlen($credentials['otp_code']) > 6) {
-                    // Recovery code
+                    // ✅ RECOVERY CODE
                     $recoveryCodes = $twoFactorService->decryptRecoveryCodes(
                         $user->two_factor_recovery_codes
                     );
@@ -100,6 +109,7 @@ class AuthController extends Controller
                         LoginAttempt::recordAttempt($email, $ipAddress, false);
                         $attempts = LoginAttempt::getFailedAttempts($email, $ipAddress);
                         $remainingAttempts = 5 - $attempts;
+
                         return response()->json([
                             'success' => false,
                             'message' => "Recovery code không hợp lệ (Còn {$remainingAttempts} lần thử)",
@@ -115,13 +125,17 @@ class AuthController extends Controller
 
                     $user->two_factor_recovery_codes = $twoFactorService->encryptRecoveryCodes($recoveryCodes);
                     $user->save();
+
+                    Log::info('Recovery code verified successfully', ['email' => $email]);
                 } else {
-                    // Regular OTP
+                    // ✅ REGULAR OTP
                     if (!$twoFactorService->verifyCode($secret, $credentials['otp_code'])) {
                         LoginAttempt::recordAttempt($email, $ipAddress, false);
                         $attempts = LoginAttempt::getFailedAttempts($email, $ipAddress);
                         $remainingAttempts = 5 - $attempts;
+
                         Log::warning('OTP verification failed', ['email' => $email]);
+
                         return response()->json([
                             'success' => false,
                             'message' => "Mã OTP không chính xác (Còn {$remainingAttempts} lần thử)",
@@ -129,38 +143,84 @@ class AuthController extends Controller
                             'attempts' => $attempts
                         ], 400);
                     }
+
+                    Log::info('OTP verified successfully', ['email' => $email]);
                 }
             }
 
-            // ✅ SAU KHI verify 2FA thành công, MỚI cleanup và tạo refresh token
+            // ✅ 4. SAU KHI VERIFY THÀNH CÔNG (hoặc không cần 2FA), TẠO TOKEN
+            Log::info('Creating JWT token for user', ['user_id' => $user->id, 'email' => $email]);
+
+            $token = JWTAuth::fromUser($user);
+
+            Log::info('JWT token created', [
+                'user_id' => $user->id,
+                'token_length' => strlen($token)
+            ]);
+
+            // ✅ 5. UPDATE LAST LOGIN
+            $user->update(['last_login_at' => now()]);
+
+            // ✅ 6. CLEANUP OLD REFRESH TOKENS & CREATE NEW ONE
+            Log::info('Cleaning up old refresh tokens', ['user_id' => $user->id]);
+
             RefreshToken::revokeUserTokens($user->id, 5);
+
+            Log::info('Generating new refresh token', ['user_id' => $user->id]);
 
             $refreshTokenData = RefreshToken::generate(
                 $user->id,
                 $request->header('User-Agent')
             );
 
+            Log::info('Refresh token generated', [
+                'user_id' => $user->id,
+                'token_length' => strlen($refreshTokenData['token_string']),
+                'token_refresh' => $refreshTokenData
+            ]);
+
+            // ✅ 7. CLEAR LOGIN ATTEMPTS
             LoginAttempt::recordAttempt($email, $ipAddress, true);
             LoginAttempt::clearAttempts($email, $ipAddress);
 
-            return response()->json([
+            Log::info('Login successful', [
+                'user_id' => $user->id,
+                'email' => $email,
+                'has_2fa' => $user->two_factor_enabled
+            ]);
+
+            // ✅ 8. RETURN SUCCESS RESPONSE
+            $response = [
                 'success' => true,
                 'message' => 'Đăng nhập thành công',
-                'user' => $result['user'],
-                'token' => $result['token'],
+                'user' => $user,
+                'token' => $token,
                 'refresh_token' => $refreshTokenData['token_string'],
                 'expires_in' => config('jwt.ttl', 60) * 60,
                 'token_type' => 'Bearer'
-            ], 200);
+            ];
+
+            Log::info('Login response data', [
+                'has_token' => !empty($response['token']),
+                'has_refresh_token' => !empty($response['refresh_token']),
+                'token_length' => strlen($response['token']),
+                'refresh_token_length' => strlen($response['refresh_token'])
+            ]);
+
+            return response()->json($response, 200);
         } catch (Exception $e) {
+            Log::error('Login exception', [
+                'email' => $request->input('email'),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             $email = $request->input('email');
             $ipAddress = $request->ip();
 
             LoginAttempt::recordAttempt($email, $ipAddress, false);
 
             $failedAttempts = LoginAttempt::getFailedAttempts($email, $ipAddress);
-
-            $message = $e->getMessage();
             $locked = $failedAttempts >= 5;
             $lockUntil = null;
 
@@ -169,7 +229,7 @@ class AuthController extends Controller
                 $lockUntil = LoginAttempt::getLockUntil($email, $ipAddress);
             } else {
                 $remainingAttempts = 5 - $failedAttempts;
-                $message .= ' (Còn ' . $remainingAttempts . ' lần thử)';
+                $message = $e->getMessage();
             }
 
             return response()->json([
@@ -187,6 +247,13 @@ class AuthController extends Controller
         try {
             $refreshTokenString = $request->input('refresh_token') ?? $request->header('refresh_token');
 
+            Log::info('=== REFRESH TOKEN REQUEST ===', [
+                'has_body_token' => !empty($request->input('refresh_token')),
+                'has_header_token' => !empty($request->header('refresh_token')),
+                'token_length' => $refreshTokenString ? strlen($refreshTokenString) : 0,
+                'token_first_10' => $refreshTokenString ? substr($refreshTokenString, 0, 10) : 'null'
+            ]);
+
             if (!$refreshTokenString) {
                 Log::error('Refresh token not provided', [
                     'body' => $request->all(),
@@ -199,18 +266,45 @@ class AuthController extends Controller
                 ], 401);
             }
 
+            // Hash token để tìm trong DB
+            $hashedToken = hash('sha256', $refreshTokenString);
+
+            Log::info('Searching for token in database', [
+                'hashed_token_first_20' => substr($hashedToken, 0, 20)
+            ]);
+
             $tokenRecord = RefreshToken::verify($refreshTokenString);
 
             if (!$tokenRecord) {
-                Log::error('Invalid or expired refresh token', [
-                    'token_length' => strlen($refreshTokenString)
+                Log::error('Token not found in database', [
+                    'hashed_token' => $hashedToken,
+                    'latest_tokens_in_db' => RefreshToken::orderBy('created_at', 'desc')
+                        ->take(5)
+                        ->get()
+                        ->map(function ($t) {
+                            return [
+                                'id' => $t->id,
+                                'user_id' => $t->user_id,
+                                'token_first_20' => substr($t->token, 0, 20),
+                                'created_at' => $t->created_at,
+                                'expires_at' => $t->expires_at
+                            ];
+                        })
+                        ->toArray()
                 ]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Refresh token không hợp lệ hoặc đã hết hạn',
                     'require_login' => true
                 ], 401);
             }
+
+            Log::info('Token found in database', [
+                'token_id' => $tokenRecord->id,
+                'user_id' => $tokenRecord->user_id,
+                'expires_at' => $tokenRecord->expires_at
+            ]);
 
             $user = $tokenRecord->user;
 
@@ -224,17 +318,24 @@ class AuthController extends Controller
                 ], 401);
             }
 
+            // Tạo access token mới
             $newAccessToken = JWTAuth::fromUser($user);
 
+            Log::info('New access token created', [
+                'user_id' => $user->id,
+                'token_length' => strlen($newAccessToken)
+            ]);
+
+            // Xóa token cũ và tạo refresh token mới
             $tokenRecord->delete();
             $newRefreshTokenData = RefreshToken::generate(
                 $user->id,
                 $request->header('User-Agent')
             );
 
-            Log::info('Token refreshed successfully', [
+            Log::info('New refresh token created', [
                 'user_id' => $user->id,
-                'email' => $user->email
+                'token_length' => strlen($newRefreshTokenData['token_string'])
             ]);
 
             return response()->json([
